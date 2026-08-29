@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Fixture</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fixture">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#10151F">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{
+  --ink:#10151F; --ink-raised:#161D2B; --amber:#FFB100; --paper:#F5F1E8;
+  --pitch:#2F6F4F; --chalk:#EDEAE0; --slate:#8A8578; --sold:#B4483C; --blue:#4A7FB5;
+  /* "chrome" tokens are the ones that actually swap between dark/light mode.
+     --ink/--chalk/--paper etc above stay fixed — they're used as "always
+     dark ink" / "always light paper" colors inside cards and the ticker,
+     which intentionally keep their look in both themes (the ticker in
+     particular is meant to look like a permanently-lit scoreboard sign). */
+  --chrome-bg:var(--ink); --chrome-surface:var(--ink-raised);
+  --chrome-text:var(--chalk); --chrome-text-muted:var(--slate);
+  --chrome-border:rgba(237,234,224,0.18);
+  --map-label-bg:rgba(16,21,31,0.75); --map-label-text:#EDEAE0;
+}
+[data-theme="light"]{
+  --chrome-bg:#F7F5EF; --chrome-surface:#EAE4D6;
+  --chrome-text:#10151F; --chrome-text-muted:#6B6558;
+  --chrome-border:rgba(16,21,31,0.15);
+  --map-label-bg:rgba(255,255,255,0.88); --map-label-text:#10151F;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+html,body{margin:0; height:100%; background:var(--chrome-bg); overscroll-behavior:none; transition:background 0.2s ease;}
+body{font-family:'IBM Plex Sans',sans-serif; color:var(--chrome-text);}
+#app{display:flex; flex-direction:column; height:100vh; height:100dvh; max-width:520px; margin:0 auto; position:relative; overflow:hidden;}
+/* Cheap fluid-layout fix for desktop/wide screens — not a bespoke redesign,
+   just stops the app being a narrow mobile column stranded in a sea of
+   empty space on a laptop/desktop browser. Everything inside is already
+   flex/relative, so widening the container is enough to make it usable;
+   a real side-by-side desktop layout (map+list together, sidebar filters)
+   is a deliberately separate, later phase. */
+@media (min-width: 900px){
+  #app{max-width:1100px; margin:24px auto; height:calc(100vh - 48px); height:calc(100dvh - 48px); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,0.35); border:1px solid var(--chrome-border);}
+}
+.header{padding:calc(env(safe-area-inset-top) + 14px) 18px 8px;}
+.header-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+.wordmark{font-family:'Oswald',sans-serif; font-size:22px; font-weight:700; letter-spacing:0.5px;}
+.wordmark .dot{color:var(--amber);}
+.header-right{display:flex; align-items:center; gap:10px;}
+.count{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--chrome-text-muted); letter-spacing:0.5px;}
+.avatar-btn,.theme-btn{width:32px; height:32px; border-radius:50%; border:1.5px solid var(--chrome-border); background:var(--chrome-surface); color:var(--chrome-text); font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;}
+.avatar-btn.logged-in{background:var(--amber); color:var(--ink); border-color:var(--amber);}
+.live-status{font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.3px; padding:0 18px 8px; color:var(--chrome-text-muted); display:flex; align-items:center; gap:6px;}
+.live-dot{width:6px; height:6px; border-radius:50%; background:var(--chrome-text-muted); flex-shrink:0;}
+.live-status.ok .live-dot{background:#4CAF50; box-shadow:0 0 0 3px rgba(76,175,80,0.25);}
+.live-status.fail .live-dot{background:var(--sold);}
+.badge-live{font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:0.4px; color:#4CAF50; border:1px solid #4CAF50; border-radius:4px; padding:2px 5px; margin-left:6px;}
+.badge-real{font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:0.4px; color:#4A9FE0; border:1px solid #4A9FE0; border-radius:4px; padding:2px 5px; margin-left:6px;}
+.badge-demo{font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:0.4px; color:var(--slate); border:1px solid var(--slate); border-radius:4px; padding:2px 5px; margin-left:6px;}
+.search-row{display:flex; gap:8px; padding:10px 18px 4px; align-items:center;}
+.search-box{flex:1; display:flex; align-items:center; gap:7px; background:var(--chrome-surface); border:1px solid var(--chrome-border); border-radius:9px; padding:0 12px; height:38px;}
+.search-icon{font-size:13px; opacity:0.7; flex-shrink:0;}
+.search-box input[type="search"]{flex:1; min-width:0; border:none; background:none; outline:none; font-family:'IBM Plex Sans',sans-serif; font-size:13.5px; color:var(--chrome-text); height:100%;}
+.search-box input[type="search"]::placeholder{color:var(--chrome-text-muted);}
+.search-box input[type="search"]::-webkit-search-cancel-button{filter:var(--search-cancel-filter, none);}
+#dateInput{flex:0 0 auto; width:118px; height:38px; border:1px solid var(--chrome-border); border-radius:9px; background:var(--chrome-surface); color:var(--chrome-text); font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; padding:0 8px; outline:none;}
+[data-theme="light"] #dateInput{color-scheme:light;}
+[data-theme="dark"] #dateInput,:root:not([data-theme]) #dateInput{color-scheme:dark;}
+.sports-row{padding:12px 18px; display:flex; gap:8px;}
+.sports-btn{display:flex; align-items:center; gap:8px; background:var(--chrome-surface); border:1px solid var(--amber); color:var(--amber); border-radius:9px; padding:10px 16px; font-family:inherit; font-size:13.5px; font-weight:600; cursor:pointer;}
+.sports-btn .badge{background:var(--amber); color:var(--ink); border-radius:999px; min-width:20px; height:20px; padding:0 5px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;}
+.sport-sheet-row{display:flex; align-items:center; justify-content:space-between; padding:13px 2px; border-top:1px solid rgba(0,0,0,0.08); font-family:'IBM Plex Sans',sans-serif; font-size:14.5px; font-weight:500; color:#10151F; cursor:pointer;}
+.sport-sheet-row .meta{display:flex; align-items:center; gap:9px;}
+.sport-sheet-row .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+.sport-sheet-row .count{font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8A8578;}
+.sport-check{width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;}
+.sport-check.on{background:var(--amber); color:#10151F;}
+.sport-check.off{border:1.5px solid rgba(0,0,0,0.2);}
+.sheet-link{background:none; border:none; font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3px; color:#4A9FE0; text-decoration:underline; cursor:pointer; padding:0;}
+.toggle-row{display:flex; gap:8px; padding:0 18px 12px;}
+.active-filters{display:flex; gap:7px; flex-wrap:wrap; align-items:center; padding:0 18px 12px;}
+.filter-pill{display:flex; align-items:center; gap:6px; background:var(--chrome-surface); border:1px solid; border-radius:999px; padding:5px 6px 5px 12px; font-family:'IBM Plex Sans',sans-serif; font-size:12px; font-weight:600; white-space:nowrap;}
+.filter-pill .pill-x{width:16px; height:16px; border-radius:50%; background:rgba(128,128,128,0.2); display:flex; align-items:center; justify-content:center; font-size:9px; border:none; color:inherit; cursor:pointer; flex-shrink:0;}
+.filter-pill.f-sport{border-color:#FFB100; color:#FFB100;}
+.filter-pill.f-date{border-color:#9ACD32; color:#9ACD32;}
+.filter-pill.f-search{border-color:#4A9FE0; color:#4A9FE0;}
+.filter-pill.f-near{border-color:#E85D75; color:#E85D75;}
+.clear-all-btn{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--chrome-text-muted); text-decoration:underline; background:none; border:none; cursor:pointer; padding:4px;}
+.toggle-btn{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 0; border-radius:8px; border:none; font-weight:600; font-size:13px; background:var(--chrome-surface); color:var(--chrome-text); font-family:inherit;}
+.toggle-btn.active{background:var(--amber); color:var(--ink);}
+.saved-toggle{flex:0 0 auto; padding:9px 12px; border-radius:8px; border:none; font-weight:600; font-size:13px; background:var(--chrome-surface); color:var(--chrome-text); font-family:inherit;}
+.saved-toggle.active{background:#E85D75; color:var(--ink);}
+.body{flex:1; position:relative; overflow:hidden;}
+.view{position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.map-canvas{height:100%; position:relative; isolation:isolate;}
+#leafletMap{position:absolute; inset:0;}
+.map-label{position:absolute; top:10px; left:14px; z-index:500; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:var(--map-label-text); letter-spacing:0.4px; background:var(--map-label-bg); padding:3px 7px; border-radius:5px; pointer-events:none; transition:background 0.2s ease, color 0.2s ease;}
+.leaflet-popup-content-wrapper{background:#F5F1E8; color:#10151F; border-radius:10px;}
+.leaflet-popup-content{font-family:'IBM Plex Sans',sans-serif; font-size:13px; margin:9px 11px;}
+.leaflet-popup-tip{background:#F5F1E8;}
+.pin-dot{border-radius:50%; border:2px solid #10151F; box-shadow:0 0 0 3px rgba(255,255,255,0.2);}
+.user-dot{width:14px; height:14px; border-radius:50%; background:#4A9FE0; border:3px solid #FFFFFF; box-shadow:0 0 0 4px rgba(74,159,224,0.35), 0 2px 6px rgba(0,0,0,0.4);}
+.locate-btn{position:absolute; left:10px; bottom:10px; z-index:500; width:38px; height:38px; border-radius:8px; border:none; background:#F5F1E8; color:#10151F; font-size:17px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.35); cursor:pointer;}
+.locate-btn.active{background:#4A9FE0; color:#fff;}
+.leaflet-control-attribution{font-size:9.5px !important;}
+.pin{position:absolute; width:17px; height:17px; border-radius:50%; border:2px solid var(--ink); box-shadow:0 0 0 3px rgba(255,255,255,0.08); transform:translate(-50%,-50%); padding:0;}
+.empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; padding:24px; text-align:center;}
+.empty span{font-size:13px; color:var(--chrome-text-muted);}
+.list{padding:14px 18px 24px; display:flex; flex-direction:column; gap:10px;}
+.card{position:relative; text-align:left; width:100%; background:var(--paper); border:none; border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; font-family:inherit; cursor:pointer;}
+.card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding-right:30px;}
+.card-sport{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;}
+.card-title{font-family:'Oswald',sans-serif; font-size:18px; font-weight:600; color:var(--ink); line-height:1.15; margin-top:2px;}
+.card-dot{width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0;}
+.card-meta{display:flex; align-items:center; gap:12px; font-size:12.5px; color:#4A4636; flex-wrap:wrap;}
+.pill{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:500; letter-spacing:0.3px; text-transform:uppercase; border-radius:4px; padding:3px 6px; display:inline-block; width:fit-content;}
+.save-btn{position:absolute; top:12px; right:12px; background:none; border:none; font-size:18px; padding:4px; cursor:pointer; line-height:1;}
+.scrim{position:absolute; inset:0; background:rgba(16,21,31,0.72); display:flex; align-items:flex-end; z-index:2000;}
+.sheet{background:var(--paper); width:100%; border-radius:16px 16px 0 0; padding:20px 20px calc(env(safe-area-inset-bottom) + 22px); display:flex; flex-direction:column; gap:14px; color:var(--ink); max-height:80%; overflow-y:auto;}
+.sheet-top{display:flex; justify-content:space-between; align-items:flex-start;}
+.sheet-sport{font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;}
+.sheet-title{font-family:'Oswald',sans-serif; font-size:24px; font-weight:600; margin-top:4px;}
+.sheet-close{background:none; border:none; font-size:20px; color:#4A4636; padding:4px;}
+.sheet-meta{display:flex; flex-direction:column; gap:6px; font-size:13.5px; color:#332F24;}
+.sheet-blurb{font-size:13.5px; color:#4A4636; line-height:1.5; font-style:italic;}
+.sheet-source{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--slate);}
+.cta{margin-top:4px; border:none; border-radius:8px; padding:14px 16px; font-family:inherit; font-weight:600; font-size:14px; display:flex; align-items:center; justify-content:center; gap:8px;}
+/* Auth sheet */
+.auth-tabs{display:flex; gap:0; border-bottom:1px solid rgba(0,0,0,0.1);}
+.auth-tab{flex:1; padding:10px 0; text-align:center; font-family:inherit; font-weight:600; font-size:13.5px; background:none; border:none; color:#8A8578; border-bottom:2px solid transparent;}
+.auth-tab.active{color:var(--ink); border-bottom:2px solid var(--amber);}
+.field{display:flex; flex-direction:column; gap:5px;}
+.field label{font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.3px; text-transform:uppercase; color:#6B6558;}
+.field input{font-family:inherit; font-size:14.5px; padding:11px 12px; border-radius:8px; border:1px solid rgba(0,0,0,0.15); background:#FFFFFF;}
+.auth-error{font-size:12.5px; color:var(--sold);}
+.profile-row{display:flex; align-items:center; gap:12px; padding:4px 0 8px;}
+.profile-avatar{width:44px; height:44px; border-radius:50%; background:var(--amber); color:var(--ink); display:flex; align-items:center; justify-content:center; font-family:'Oswald',sans-serif; font-weight:700; font-size:18px; flex-shrink:0;}
+.profile-name{font-family:'Oswald',sans-serif; font-size:17px; font-weight:600;}
+.profile-email{font-family:'IBM Plex Sans',sans-serif; font-size:12px; color:#6B6558;}
+.menu-item{text-align:left; background:none; border:none; font-family:inherit; font-size:14.5px; padding:13px 2px; border-top:1px solid rgba(0,0,0,0.08); color:var(--ink);}
+.menu-item.danger{color:var(--sold);}
+.note{font-size:12px; color:#8A8578; line-height:1.5;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-row">
+      <span class="wordmark">FIXTURE<span class="dot">.</span></span>
+      <div class="header-right">
+        <span class="count" id="eventCount">0 EVENTS</span>
+        <button class="theme-btn" id="themeBtn" title="Toggle dark/light mode">🌙</button>
+        <button class="avatar-btn" id="avatarBtn">☺</button>
+      </div>
+    </div>
+  </div>
+  <div class="live-status" id="liveStatus" style="display:none;"><span class="live-dot"></span><span id="liveStatusText"></span></div>
+  <div class="search-row">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="searchInput" placeholder="Search teams, venues, competitions…" autocomplete="off">
+    </div>
+    <input type="date" id="dateInput" min="2026-08-01" max="2027-07-17" title="Filter by date">
+  </div>
+  <div class="sports-row">
+    <button class="sports-btn" id="sportsBtn">🏆 <span id="sportsBtnLabel">Sports</span></button>
+    <button class="sports-btn" id="countryBtn">🌍 <span id="countryBtnLabel">Countries</span></button>
+  </div>
+  <div class="toggle-row">
+    <button class="toggle-btn active" id="mapBtn">⊡ Map</button>
+    <button class="toggle-btn" id="listBtn">☰ List</button>
+    <button class="saved-toggle" id="savedBtn">♥ Saved</button>
+  </div>
+  <div class="active-filters" id="activeFilters"></div>
+  <div class="body">
+    <div class="view" id="mapView"></div>
+    <div class="view" id="listView" style="display:none;"></div>
+    <div id="sheetHost"></div>
+    <div id="sportSheetHost"></div>
+    <div id="countrySheetHost"></div>
+    <div id="authHost"></div>
+  </div>
+</div>
+
+<script>
+const SPORTS = {
+  football: { name: "Football", color: "#FFB100" },
+  rugby: { name: "Rugby", color: "#B4483C" },
+  rugbyleague: { name: "Rugby League", color: "#1B998B" },
+  basketball: { name: "Basketball", color: "#E8722C" },
+  tennis: { name: "Tennis", color: "#9ACD32" },
+  golf: { name: "Golf", color: "#2F6F4F" },
+  cricket: { name: "Cricket", color: "#D8CBA0" },
+  netball: { name: "Netball", color: "#E85D75" },
+  icehockey: { name: "Ice Hockey", color: "#6FB7C9" },
+  snooker: { name: "Snooker", color: "#7A3B69" },
+  boxing: { name: "Boxing", color: "#E63946" },
+  darts: { name: "Darts", color: "#D4A017" },
+  americanfootball: { name: "American Football", color: "#8B4513" },
+  athletics: { name: "Athletics", color: "#5B8C5A" },
+};
+const CITIES = { london: { name: "London", country: "UK" }, manchester: { name: "Manchester", country: "UK" }, birmingham: { name: "Birmingham", country: "UK" }, liverpool: { name: "Liverpool", country: "UK" }, bristol: { name: "Bristol", country: "UK" }, sheffield: { name: "Sheffield", country: "UK" }, nottingham: { name: "Nottingham", country: "UK" }, glasgow: { name: "Glasgow", country: "UK" }, cardiff: { name: "Cardiff", country: "UK" }, edinburgh: { name: "Edinburgh", country: "UK" }, dublin: { name: "Dublin", country: "Ireland" }, leeds: { name: "Leeds", country: "UK" }, leicester: { name: "Leicester", country: "UK" }, belfast: { name: "Belfast", country: "UK" }, newcastle: { name: "Newcastle", country: "UK" }, sunderland: { name: "Sunderland", country: "UK" }, bournemouth: { name: "Bournemouth", country: "UK" }, coventry: { name: "Coventry", country: "UK" }, madrid: { name: "Madrid", country: "Spain" }, hull: { name: "Hull", country: "UK" }, brighton: { name: "Brighton", country: "UK" }, amsterdam: { name: "Amsterdam", country: "Netherlands" }, wigan: { name: "Wigan", country: "UK" }, castleford: { name: "Castleford", country: "UK" }, bradford: { name: "Bradford", country: "UK" }, huddersfield: { name: "Huddersfield", country: "UK" }, sthelens: { name: "St Helens", country: "UK" }, wakefield: { name: "Wakefield", country: "UK" }, toulouse: { name: "Toulouse", country: "France" }, warrington: { name: "Warrington", country: "UK" }, perpignan: { name: "Perpignan", country: "France" }, barcelona: { name: "Barcelona", country: "Spain" }, berlin: { name: "Berlin", country: "Germany" }, munich: { name: "Munich", country: "Germany" }, rome: { name: "Rome", country: "Italy" }, paris: { name: "Paris", country: "France" }, york: { name: "York", country: "UK" }, dundee: { name: "Dundee", country: "UK" }, guildford: { name: "Guildford", country: "UK" }, kirkcaldy: { name: "Kirkcaldy", country: "UK" }, bayonne: { name: "Bayonne", country: "France" }, bordeaux: { name: "Bordeaux", country: "France" }, montpellier: { name: "Montpellier", country: "France" }, castres: { name: "Castres", country: "France" }, lyon: { name: "Lyon", country: "France" }, larochelle: { name: "La Rochelle", country: "France" }, gloucester: { name: "Gloucester", country: "UK" } };
+
+// tag: 'real' — a genuine fixture, verified against a live public source and
+// hard-coded as a snapshot (not fetched live by the browser on every visit —
+// see the README for why: most sports APIs block direct browser requests via
+// CORS, which is exactly why a real backend, not client-side fetching, is
+// the right long-term approach).
+let EVENTS = [
+  { id:"e26", sport:"football", city:"london", tier:"English Premier League", home:"Crystal Palace", away:"Manchester City", venue:"Selhurst Park", area:"Selhurst", date:"Fri 28 Aug", isoDate:"2026-08-28", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.3983, lng:-0.0856 },
+  { id:"e27", sport:"football", city:"manchester", tier:"English Premier League", home:"Manchester United", away:"Ipswich Town", venue:"Old Trafford", area:"Trafford", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"16:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.4631, lng:-2.2913 },
+  { id:"e28", sport:"football", city:"manchester", tier:"English Premier League", home:"Manchester City", away:"Coventry City", venue:"Etihad Stadium", area:"Eastlands", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4831, lng:-2.2004 },
+  { id:"e29", sport:"football", city:"birmingham", tier:"English Premier League", home:"Aston Villa", away:"Arsenal", venue:"Villa Park", area:"Aston", date:"Mon 31 Aug", isoDate:"2026-08-31", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.5092, lng:-1.8848 },
+  { id:"e30", sport:"football", city:"birmingham", tier:"English Premier League", home:"Aston Villa", away:"Nottingham Forest", venue:"Villa Park", area:"Aston", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.5092, lng:-1.8848 },
+  { id:"e31", sport:"rugby", city:"london", tier:"Premiership Rugby Cup", home:"Saracens", away:"Northampton Saints", venue:"StoneX Stadium", area:"Barnet", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.60361, lng:-0.22361 },
+  { id:"e32", sport:"basketball", city:"london", tier:"Super League Basketball", home:"London Lions", away:"Liverpool Basketball", venue:"Copper Box Arena", area:"Stratford", date:"Sun 27 Sep", isoDate:"2026-09-27", time:"16:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.5444, lng:-0.0201 },
+  { id:"e33", sport:"football", city:"london", tier:"English Premier League", home:"Arsenal", away:"Chelsea", venue:"Emirates Stadium", area:"Holloway", date:"Sun 06 Sep", isoDate:"2026-09-06", time:"16:30", status:"official", source:"Ticketmaster", tag:"real", lat:51.5549, lng:-0.1084 },
+  { id:"e34", sport:"football", city:"london", tier:"English Premier League", home:"Tottenham", away:"Newcastle", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"17:30", status:"official", source:"Ticketmaster", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e35", sport:"football", city:"london", tier:"English Premier League", home:"Chelsea", away:"Brighton", venue:"Stamford Bridge", area:"Fulham", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"14:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4817, lng:-0.191 },
+  { id:"e36", sport:"football", city:"london", tier:"English Premier League", home:"Fulham", away:"Crystal Palace", venue:"Craven Cottage", area:"Fulham", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4749, lng:-0.2216 },
+  { id:"e37", sport:"football", city:"london", tier:"English Premier League", home:"Brentford", away:"Sunderland", venue:"Brentford Community Stadium", area:"Brentford", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4904, lng:-0.2887 },
+  { id:"e38", sport:"football", city:"london", tier:"English Premier League", home:"Chelsea", away:"Hull City", venue:"Stamford Bridge", area:"Fulham", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4817, lng:-0.191 },
+  { id:"e39", sport:"football", city:"london", tier:"English Premier League", home:"Crystal Palace", away:"Ipswich Town", venue:"Selhurst Park", area:"Selhurst", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.3983, lng:-0.0856 },
+  { id:"e40", sport:"football", city:"london", tier:"English Premier League", home:"Tottenham", away:"Everton", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"17:30", status:"official", source:"Ticketmaster", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e41", sport:"football", city:"manchester", tier:"English Premier League", home:"Manchester United", away:"Manchester City", venue:"Old Trafford", area:"Trafford", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"16:30", status:"official", source:"Ticketmaster", tag:"real", blurb:"The Manchester Derby.", lat:53.4631, lng:-2.2913 },
+  { id:"e42", sport:"football", city:"london", tier:"English Premier League", home:"Brentford", away:"Chelsea", venue:"Brentford Community Stadium", area:"Brentford", date:"Fri 18 Sep", isoDate:"2026-09-18", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4904, lng:-0.2887 },
+  { id:"e43", sport:"football", city:"london", tier:"English Premier League", home:"Tottenham", away:"Aston Villa", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e44", sport:"football", city:"manchester", tier:"English Premier League", home:"Manchester City", away:"Sunderland", venue:"Etihad Stadium", area:"Eastlands", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4831, lng:-2.2004 },
+  { id:"e45", sport:"rugby", city:"manchester", tier:"Premiership Rugby Cup", home:"Sale Sharks", away:"Bath Rugby", venue:"Salford Community Stadium", area:"Salford", date:"Sun 06 Sep", isoDate:"2026-09-06", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.487, lng:-2.3212 },
+  { id:"e46", sport:"rugby", city:"manchester", tier:"Gallagher Premiership Rugby", home:"Sale Sharks", away:"Bristol Bears", venue:"Salford Community Stadium", area:"Salford", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.487, lng:-2.3212 },
+  { id:"e48", sport:"cricket", city:"birmingham", tier:"County Championship", home:"Warwickshire", away:"Leicestershire", venue:"Edgbaston", area:"Edgbaston", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"11:00", status:"official", source:"Club box office", tag:"real", lat:52.4556, lng:-1.9028 },
+  { id:"e49", sport:"cricket", city:"london", tier:"County Championship", home:"Middlesex", away:"Northamptonshire", venue:"Lord's", area:"St John's Wood", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"11:00", status:"official", source:"Club box office", tag:"real", lat:51.5299, lng:-0.1721 },
+  { id:"e50", sport:"tennis", city:"london", tier:"Davis Cup Qualifier", home:"Great Britain", away:"Ecuador", venue:"Copper Box Arena", area:"Stratford", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"13:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"Davis Cup Qualifier 2nd Round — winner advances to the Final 8 in November.", lat:51.5444, lng:-0.0201 },
+  { id:"e51", sport:"icehockey", city:"manchester", tier:"Elite Ice Hockey League", home:"Manchester Storm", away:"Nottingham Panthers", venue:"AO Arena", area:"Manchester City Centre", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"18:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"Storm's first season playing at the AO Arena.", lat:53.4887, lng:-2.245 },
+  { id:"e53", sport:"golf", city:"london", tier:"DP World Tour — Rolex Series", eventName:"BMW PGA Championship — Round 1", venue:"Wentworth Club", area:"Virginia Water", date:"Thu 17 Sep", isoDate:"2026-09-17", time:"08:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4041, lng:-0.5786 },
+  { id:"e54", sport:"football", city:"liverpool", tier:"English Premier League", home:"Liverpool", away:"Nottingham Forest", venue:"Anfield", area:"Anfield", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.4308, lng:-2.9608 },
+  { id:"e55", sport:"football", city:"liverpool", tier:"English Premier League", home:"Everton", away:"Manchester United", venue:"Hill Dickinson Stadium", area:"Bramley-Moore Dock", date:"Sun 06 Sep", isoDate:"2026-09-06", time:"14:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4483, lng:-2.993 },
+  { id:"e56", sport:"football", city:"bristol", tier:"EFL Championship", home:"Bristol City", away:"Portsmouth", venue:"Ashton Gate", area:"Bedminster", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.44, lng:-2.6203 },
+  { id:"e57", sport:"rugby", city:"bristol", tier:"Premiership Rugby Cup", home:"Bristol Bears", away:"Gloucester Rugby", venue:"Ashton Gate", area:"Bedminster", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"West Country derby.", lat:51.44, lng:-2.6203 },
+  { id:"e58", sport:"football", city:"sheffield", tier:"EFL League One", home:"Sheffield Wednesday", away:"Wigan Athletic", venue:"Hillsborough", area:"Owlerton", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:53.4111, lng:-1.5 },
+  { id:"e59", sport:"football", city:"nottingham", tier:"English Premier League", home:"Nottingham Forest", away:"Tottenham", venue:"City Ground", area:"West Bridgford", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:52.9399, lng:-1.1327 },
+  { id:"e60", sport:"football", city:"glasgow", tier:"Scottish Premiership", home:"Celtic", away:"Rangers", venue:"Celtic Park", area:"Parkhead", date:"Sun 20 Sep", isoDate:"2026-09-20", time:"12:00", status:"official", source:"Club box office", tag:"real", blurb:"The Old Firm derby.", lat:55.8497, lng:-4.2058 },
+  { id:"e61", sport:"football", city:"edinburgh", tier:"Scottish Premiership", home:"Hibernian", away:"Hearts", venue:"Easter Road", area:"Leith", date:"Wed 02 Sep", isoDate:"2026-09-02", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"The Edinburgh derby.", lat:55.9614, lng:-3.1656 },
+  { id:"e62", sport:"football", city:"cardiff", tier:"EFL Championship", home:"Cardiff City", away:"Sheffield United", venue:"Cardiff City Stadium", area:"Leckwith", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.4727, lng:-3.2033 },
+  { id:"e63", sport:"boxing", city:"dublin", tier:"World Title Fight", eventName:"Katie Taylor v Flora Pili", venue:"Croke Park", area:"Drumcondra", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"16:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.3607, lng:-6.2513 },
+  { id:"e64", sport:"rugby", city:"dublin", tier:"WXV Global Series", eventName:"Ireland Women v USA Women", venue:"Tallaght Stadium", area:"Tallaght", date:"Sun 20 Sep", isoDate:"2026-09-20", time:"13:45", status:"official", source:"Ticketmaster", tag:"real", lat:53.2879, lng:-6.3736 },
+  { id:"e65", sport:"football", city:"dublin", tier:"UEFA Nations League", home:"Republic of Ireland", away:"Austria", venue:"Aviva Stadium", area:"Ballsbridge", date:"Thu 01 Oct", isoDate:"2026-10-01", time:"19:45", status:"official", source:"Ticketmaster", tag:"real", lat:53.3352, lng:-6.2286 },
+  { id:"e66", sport:"rugby", city:"dublin", tier:"Autumn Nations Series", home:"Ireland", away:"Argentina", venue:"Aviva Stadium", area:"Ballsbridge", date:"Fri 06 Nov", isoDate:"2026-11-06", time:"19:45", status:"official", source:"Club box office", tag:"real", lat:53.3352, lng:-6.2286 },
+  { id:"e67", sport:"rugby", city:"dublin", tier:"Autumn Nations Series", home:"Ireland", away:"Fiji", venue:"Aviva Stadium", area:"Ballsbridge", date:"Sun 08 Nov", isoDate:"2026-11-08", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:53.3352, lng:-6.2286 },
+  { id:"e68", sport:"football", city:"dublin", tier:"UEFA Nations League", home:"Republic of Ireland", away:"Kosovo", venue:"Aviva Stadium", area:"Ballsbridge", date:"Sat 14 Nov", isoDate:"2026-11-14", time:"19:45", status:"official", source:"Ticketmaster", tag:"real", lat:53.3352, lng:-6.2286 },
+  { id:"e69", sport:"football", city:"london", tier:"English Premier League", home:"Arsenal", away:"Leeds United", venue:"Emirates Stadium", area:"Holloway", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:51.5549, lng:-0.1084 },
+  { id:"e70", sport:"football", city:"birmingham", tier:"English Premier League", home:"Aston Villa", away:"Manchester City", venue:"Villa Park", area:"Aston", date:"Sat 24 Oct", isoDate:"2026-10-24", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.5092, lng:-1.8848 },
+  { id:"e71", sport:"rugby", city:"glasgow", tier:"United Rugby Championship", home:"Glasgow Warriors", away:"Ulster", venue:"Scotstoun Stadium", area:"Scotstoun", date:"Sat 03 Oct", isoDate:"2026-10-03", time:"19:45", status:"official", source:"Club box office", tag:"real", lat:55.8847, lng:-4.3378 },
+  { id:"e72", sport:"rugby", city:"edinburgh", tier:"United Rugby Championship", home:"Edinburgh Rugby", away:"DHL Stormers", venue:"Hive Stadium", area:"Roseburn", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"Club box office", tag:"real", lat:55.9265, lng:-3.3346 },
+  { id:"e73", sport:"rugby", city:"bristol", tier:"Gallagher Premiership Rugby", home:"Bristol Bears", away:"Northampton Saints", venue:"Ashton Gate", area:"Bedminster", date:"Sat 03 Oct", isoDate:"2026-10-03", time:"15:05", status:"official", source:"Club box office", tag:"real", blurb:"Family Day — reigning champions visit Ashton Gate.", lat:51.44, lng:-2.6203 },
+  { id:"e74", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Saracens", away:"Bristol Bears", venue:"StoneX Stadium", area:"Barnet", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"17:30", status:"official", source:"Club box office", tag:"real", lat:51.60361, lng:-0.22361 },
+  { id:"e75", sport:"football", city:"london", tier:"English Premier League", home:"Crystal Palace", away:"Arsenal", venue:"Selhurst Park", area:"Selhurst", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"Arsenal return to Selhurst Park, scene of their title celebrations.", lat:51.3983, lng:-0.0856 },
+  { id:"e76", sport:"football", city:"london", tier:"English Premier League", home:"Fulham", away:"Brighton", venue:"Craven Cottage", area:"Fulham", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.4749, lng:-0.2216 },
+  { id:"e77", sport:"football", city:"london", tier:"English Premier League", home:"Tottenham", away:"Bournemouth", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e78", sport:"football", city:"birmingham", tier:"English Premier League", home:"Aston Villa", away:"Leeds United", venue:"Villa Park", area:"Aston", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.5092, lng:-1.8848 },
+  { id:"e79", sport:"football", city:"manchester", tier:"English Premier League", home:"Manchester United", away:"Nottingham Forest", venue:"Old Trafford", area:"Trafford", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4631, lng:-2.2913 },
+  { id:"e80", sport:"football", city:"liverpool", tier:"English Premier League", home:"Everton", away:"Sunderland", venue:"Hill Dickinson Stadium", area:"Bramley-Moore Dock", date:"Sat 26 Dec", isoDate:"2026-12-26", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4483, lng:-2.993 },
+  { id:"e81", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Saracens", away:"Northampton Saints", venue:"StoneX Stadium", area:"Barnet", date:"Sat 05 Dec", isoDate:"2026-12-05", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"Reigning champions visit North London.", lat:51.60361, lng:-0.22361 },
+  { id:"e82", sport:"rugby", city:"glasgow", tier:"Investec Champions Cup", home:"Glasgow Warriors", away:"Section Paloise", venue:"Scotstoun Stadium", area:"Scotstoun", date:"Fri 11 Dec", isoDate:"2026-12-11", time:"20:00", status:"official", source:"Club box office", tag:"real", lat:55.8847, lng:-4.3378 },
+  { id:"e83", sport:"rugby", city:"manchester", tier:"Investec Champions Cup", home:"Sale Sharks", away:"Leinster", venue:"Salford Community Stadium", area:"Salford", date:"Sat 12 Dec", isoDate:"2026-12-12", time:"17:30", status:"official", source:"Club box office", tag:"real", blurb:"Rematch of last season's Champions Cup finalists.", lat:53.487, lng:-2.3212 },
+  { id:"e84", sport:"football", city:"leeds", tier:"English Premier League", home:"Leeds United", away:"Newcastle United", venue:"Elland Road", area:"Beeston", date:"Mon 14 Sep", isoDate:"2026-09-14", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.7778, lng:-1.5722 },
+  { id:"e85", sport:"rugby", city:"leicester", tier:"Premiership Rugby Cup", home:"Leicester Tigers", away:"Newcastle Red Bulls", venue:"Mattioli Woods Welford Road Stadium", area:"Aylestone", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:52.6194, lng:-1.1367 },
+  { id:"e86", sport:"snooker", city:"belfast", tier:"World Snooker Tour — Ranking Event", eventName:"BetVictor Northern Ireland Open", venue:"Waterfront Hall", area:"Lanyon Place", date:"Sun 18 Oct", isoDate:"2026-10-18", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", blurb:"Winner receives the Alex Higgins Trophy.", lat:54.5964, lng:-5.9241 },
+  { id:"e87", sport:"football", city:"newcastle", tier:"English Premier League", home:"Newcastle United", away:"AFC Bournemouth", venue:"St. James' Park", area:"Newcastle upon Tyne", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:54.9756, lng:-1.6217 },
+  { id:"e88", sport:"football", city:"sunderland", tier:"English Premier League", home:"Sunderland", away:"Arsenal", venue:"Stadium of Light", area:"Sunderland", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:54.9144, lng:-1.3883 },
+  { id:"e89", sport:"football", city:"bournemouth", tier:"English Premier League", home:"AFC Bournemouth", away:"Sunderland", venue:"Vitality Stadium", area:"Kings Park", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:50.7352, lng:-1.8384 },
+  { id:"e90", sport:"football", city:"coventry", tier:"English Premier League", home:"Coventry City", away:"Sunderland", venue:"Coventry Building Society Arena", area:"Rowley's Green", date:"Sat 31 Oct", isoDate:"2026-10-31", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"Coventry's first top-flight home game in 25 years.", lat:52.4483, lng:-1.4952 },
+  { id:"e91", sport:"football", city:"madrid", tier:"La Liga — Madrid Derby", home:"Atlético Madrid", away:"Real Madrid", venue:"Riyadh Air Metropolitano", area:"San Blas-Canillejas", date:"Sun 20 Sep", isoDate:"2026-09-20", time:"21:00", status:"official", source:"Club box office", tag:"real", blurb:"El Derbi Madrileño — Mourinho's first Madrid derby since returning to Real Madrid.", lat:40.4362, lng:-3.5995 },
+  { id:"e92", sport:"football", city:"hull", tier:"English Premier League", home:"Hull City", away:"Aston Villa", venue:"MKM Stadium", area:"Kingston upon Hull", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.7461, lng:-0.3678 },
+  { id:"e93", sport:"football", city:"hull", tier:"English Premier League", home:"Hull City", away:"Brighton", venue:"MKM Stadium", area:"Kingston upon Hull", date:"Sat 21 Nov", isoDate:"2026-11-21", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.7461, lng:-0.3678 },
+  { id:"e94", sport:"football", city:"brighton", tier:"English Premier League", home:"Brighton", away:"Brentford", venue:"American Express Stadium", area:"Falmer", date:"Sat 07 Nov", isoDate:"2026-11-07", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:50.8617, lng:-0.0837 },
+  { id:"e95", sport:"football", city:"brighton", tier:"English Premier League", home:"Brighton", away:"Newcastle United", venue:"American Express Stadium", area:"Falmer", date:"Sat 28 Nov", isoDate:"2026-11-28", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:50.8617, lng:-0.0837 },
+  { id:"e96", sport:"football", city:"amsterdam", tier:"Eredivisie", home:"Ajax", away:"PSV", venue:"Johan Cruijff ArenA", area:"Zuidoost", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"20:00", status:"official", source:"Club box office", tag:"real", blurb:"De Topper — the biggest fixture in Dutch domestic football.", lat:52.3143, lng:4.9416 },
+  { id:"e97", sport:"football", city:"amsterdam", tier:"Eredivisie", home:"Ajax", away:"AZ", venue:"Johan Cruijff ArenA", area:"Zuidoost", date:"Sat 31 Oct", isoDate:"2026-10-31", time:"21:00", status:"official", source:"Club box office", tag:"real", lat:52.3143, lng:4.9416 },
+  { id:"e98", sport:"football", city:"newcastle", tier:"English Premier League", home:"Newcastle United", away:"Hull City", venue:"St. James' Park", area:"Newcastle upon Tyne", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:54.9756, lng:-1.6217 },
+  { id:"e99", sport:"football", city:"newcastle", tier:"English Premier League", home:"Newcastle United", away:"Aston Villa", venue:"St. James' Park", area:"Newcastle upon Tyne", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"17:30", status:"official", source:"Ticketmaster", tag:"real", lat:54.9756, lng:-1.6217 },
+  { id:"e100", sport:"football", city:"sunderland", tier:"English Premier League", home:"Sunderland", away:"Fulham", venue:"Stadium of Light", area:"Sunderland", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"14:00", status:"official", source:"Ticketmaster", tag:"real", lat:54.9144, lng:-1.3883 },
+  { id:"e101", sport:"football", city:"bournemouth", tier:"English Premier League", home:"AFC Bournemouth", away:"Brighton", venue:"Vitality Stadium", area:"Kings Park", date:"Wed 02 Dec", isoDate:"2026-12-02", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:50.7352, lng:-1.8384 },
+  { id:"e102", sport:"football", city:"nottingham", tier:"English Premier League", home:"Nottingham Forest", away:"Brighton", venue:"City Ground", area:"West Bridgford", date:"Sat 05 Dec", isoDate:"2026-12-05", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:52.9399, lng:-1.1327 },
+  { id:"e103", sport:"football", city:"liverpool", tier:"English Premier League", home:"Everton", away:"Ipswich Town", venue:"Hill Dickinson Stadium", area:"Bramley-Moore Dock", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.4483, lng:-2.993 },
+  { id:"e104", sport:"football", city:"liverpool", tier:"English Premier League", home:"Everton", away:"Chelsea", venue:"Hill Dickinson Stadium", area:"Bramley-Moore Dock", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.4483, lng:-2.993 },
+  { id:"e105", sport:"rugby", city:"london", tier:"Nations Championship", home:"England", away:"Australia", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sun 08 Nov", isoDate:"2026-11-08", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"First-ever Nations Championship — a new format replacing the traditional Autumn Nations Series.", lat:51.4548, lng:-0.3417 },
+  { id:"e106", sport:"basketball", city:"london", tier:"Super League Basketball", home:"London Lions", away:"Manchester Basketball", venue:"Copper Box Arena", area:"Stratford", date:"Sun 22 Nov", isoDate:"2026-11-22", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"Reigning champions host a growing rivalry between the UK's two biggest basketball markets.", lat:51.5444, lng:-0.0201 },
+  { id:"e107", sport:"football", city:"leeds", tier:"English Premier League", home:"Leeds United", away:"Crystal Palace", venue:"Elland Road", area:"Beeston", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", lat:53.7778, lng:-1.5722 },
+  { id:"e108", sport:"football", city:"coventry", tier:"English Premier League", home:"Coventry City", away:"Hull City", venue:"Coventry Building Society Arena", area:"Rowley's Green", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.4483, lng:-1.4952 },
+  { id:"e109", sport:"football", city:"coventry", tier:"English Premier League", home:"Coventry City", away:"Newcastle United", venue:"Coventry Building Society Arena", area:"Rowley's Green", date:"Mon 12 Oct", isoDate:"2026-10-12", time:"20:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.4483, lng:-1.4952 },
+  { id:"e110", sport:"rugbyleague", city:"manchester", tier:"Betfred Super League", eventName:"Super League Grand Final", venue:"Old Trafford", area:"Trafford", date:"Sat 03 Oct", isoDate:"2026-10-03", time:"17:30", status:"official", source:"Club box office", tag:"real", blurb:"Finalists are decided by the September play-offs — not yet known this far ahead.", lat:53.4631, lng:-2.2913 },
+  { id:"e111", sport:"rugbyleague", city:"leeds", tier:"Betfred Super League", home:"Leeds Rhinos", away:"Wigan Warriors", venue:"Headingley Stadium", area:"Headingley", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:53.8168, lng:-1.5824 },
+  { id:"e112", sport:"rugbyleague", city:"leeds", tier:"Betfred Super League", home:"Leeds Rhinos", away:"Hull FC", venue:"Headingley Stadium", area:"Headingley", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"Club box office", tag:"real", lat:53.8168, lng:-1.5824 },
+  { id:"e113", sport:"rugbyleague", city:"wigan", tier:"Betfred Super League", home:"Wigan Warriors", away:"Catalans Dragons", venue:"Brick Community Stadium", area:"Newtown", date:"Sat 12 Sep", isoDate:"2026-09-12", time:"20:00", status:"official", source:"Club box office", tag:"real", blurb:"Wigan's final regular-season home game — date inferred from the confirmed round pattern, not yet individually confirmed.", lat:53.5483, lng:-2.6667 },
+  { id:"e114", sport:"rugbyleague", city:"castleford", tier:"Betfred Super League", home:"Castleford Tigers", away:"Catalans Dragons", venue:"The Jungle (Wheldon Road)", area:"Castleford", date:"Fri 28 Aug", isoDate:"2026-08-28", time:"20:00", status:"official", source:"Club box office", tag:"real", lat:53.7228, lng:-1.3469 },
+  { id:"e115", sport:"rugbyleague", city:"bradford", tier:"Betfred Super League", home:"Bradford Bulls", away:"Castleford Tigers", venue:"Bartercard Odsal Stadium", area:"Odsal", date:"Thu 03 Sep", isoDate:"2026-09-03", time:"19:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.7692, lng:-1.7469 },
+  { id:"e116", sport:"rugbyleague", city:"huddersfield", tier:"Betfred Super League", home:"Huddersfield Giants", away:"Castleford Tigers", venue:"Accu Stadium", area:"Huddersfield", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"Club box office", tag:"real", lat:53.6542, lng:-1.7681 },
+  { id:"e117", sport:"rugbyleague", city:"sthelens", tier:"Betfred Super League", home:"St Helens", away:"Leeds Rhinos", venue:"BrewDog Stadium", area:"St Helens", date:"Fri 28 Aug", isoDate:"2026-08-28", time:"19:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.4544, lng:-2.7325 },
+  { id:"e118", sport:"rugbyleague", city:"toulouse", tier:"Betfred Super League", home:"Toulouse Olympique", away:"Bradford Bulls", venue:"Stade Ernest-Wallon", area:"Toulouse", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"19:00", status:"official", source:"Ticketmaster", tag:"real", lat:43.6206, lng:1.4394 },
+  { id:"e119", sport:"rugby", city:"toulouse", tier:"Top 14", home:"Stade Toulousain", away:"Bordeaux Bègles", venue:"Stadium de Toulouse", area:"Toulouse", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"A different club, a different code of rugby, and a different stadium from Toulouse Olympique above — Stade Toulousain play rugby union in the Top 14.", lat:43.5828, lng:1.4342 },
+  { id:"e120", sport:"rugbyleague", city:"wakefield", tier:"Betfred Super League", home:"Wakefield Trinity", away:"Warrington Wolves", venue:"DIY Kitchens Stadium", area:"Wakefield", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"14:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.6709, lng:-1.4847 },
+  { id:"e121", sport:"rugbyleague", city:"hull", tier:"Betfred Super League", home:"Hull KR", away:"Huddersfield Giants", venue:"Sewell Group Craven Park", area:"Bransholme", date:"Fri 04 Sep", isoDate:"2026-09-04", time:"20:00", status:"official", source:"Club box office", tag:"real", blurb:"Hull's other rugby league club — Hull FC play on the west side of the city, Hull KR here on the east side.", lat:53.7444, lng:-0.3178 },
+  { id:"e122", sport:"icehockey", city:"cardiff", tier:"Elite Ice Hockey League", home:"Cardiff Devils", away:"Guildford Flames", venue:"Vindico Arena", area:"Cardiff Bay", date:"Wed 23 Sep", isoDate:"2026-09-23", time:"19:00", status:"official", source:"Club box office", tag:"real", blurb:"Cardiff Devils' season opener — reigning EIHL playoff champions.", lat:51.4614, lng:-3.1611 },
+  { id:"e123", sport:"football", city:"leicester", tier:"EFL Championship", home:"Leicester City", away:"Wigan Athletic", venue:"King Power Stadium", area:"Leicester", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"14:00", status:"official", source:"Ticketmaster", tag:"real", lat:52.6204, lng:-1.1422 },
+  { id:"e124", sport:"rugbyleague", city:"hull", tier:"Betfred Super League", home:"Hull FC", away:"Warrington Wolves", venue:"MKM Stadium", area:"Kingston upon Hull", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"16:30", status:"official", source:"Ticketmaster", tag:"real", blurb:"Hull FC groundshare the MKM Stadium with Hull City AFC — same stadium as the football fixtures above, different club entirely.", lat:53.7461, lng:-0.3678 },
+  { id:"e125", sport:"rugbyleague", city:"warrington", tier:"Betfred Super League", home:"Warrington Wolves", away:"Leigh Leopards", venue:"Halliwell Jones Stadium", area:"Warrington", date:"Sun 06 Sep", isoDate:"2026-09-06", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:53.4025, lng:-2.5747 },
+  { id:"e126", sport:"rugbyleague", city:"perpignan", tier:"Betfred Super League", home:"Catalans Dragons", away:"York Knights", venue:"Stade Gilbert Brutus", area:"Perpignan", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:00", status:"official", source:"Club box office", tag:"real", blurb:"Catalans Dragons are the only French club in Super League — one of two Super League cities outside the UK and Ireland, alongside Toulouse.", lat:42.7, lng:2.8886 },
+  { id:"e127", sport:"basketball", city:"madrid", tier:"EuroLeague", home:"Real Madrid", away:"Unicaja", venue:"Movistar Arena", area:"Chamartín", date:"Sun 27 Sep", isoDate:"2026-09-27", time:"19:00", status:"official", source:"Club box office", tag:"real", blurb:"Real Madrid's EuroLeague home opener — reigning runners-up, 14-time champions.", lat:40.4362, lng:-3.6633 },
+  { id:"e128", sport:"icehockey", city:"sheffield", tier:"Elite Ice Hockey League", home:"Sheffield Steelers", away:"Cardiff Devils", venue:"Utilita Arena", area:"Sheffield", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"16:00", status:"official", source:"Club box office", tag:"real", lat:53.3711, lng:-1.4703 },
+  { id:"e129", sport:"icehockey", city:"coventry", tier:"Elite Ice Hockey League", home:"Coventry Blaze", away:"Cardiff Devils", venue:"SkyDome Arena", area:"Coventry", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"17:30", status:"official", source:"Club box office", tag:"real", lat:52.4029, lng:-1.5197 },
+  { id:"e130", sport:"football", city:"wigan", tier:"EFL League One", home:"Wigan Athletic", away:"Stockport County", venue:"Brick Community Stadium", area:"Newtown", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"12:30", status:"official", source:"Ticketmaster", tag:"real", blurb:"Wigan Athletic groundshare with Wigan Warriors rugby league — same stadium as the rugby league fixture above.", lat:53.5483, lng:-2.6667 },
+  { id:"e131", sport:"football", city:"bradford", tier:"EFL League One", home:"Bradford City", away:"Mansfield Town", venue:"Valley Parade", area:"Bradford", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"15:00", status:"official", source:"Ticketmaster", tag:"real", lat:53.7894, lng:-1.7594 },
+  { id:"e133", sport:"football", city:"munich", tier:"Bundesliga", home:"FC Bayern Munich", away:"VfB Stuttgart", venue:"Allianz Arena", area:"Fröttmaning", date:"Fri 28 Aug", isoDate:"2026-08-28", time:"20:30", status:"official", source:"Club box office", tag:"real", lat:48.2188, lng:11.6247 },
+  { id:"e134", sport:"football", city:"berlin", tier:"Bundesliga", home:"1. FC Union Berlin", away:"Eintracht Frankfurt", venue:"Stadion An der Alten Försterei", area:"Köpenick", date:"Sat 29 Aug", isoDate:"2026-08-29", time:"15:30", status:"official", source:"Club box office", tag:"real", lat:52.4571, lng:13.5678 },
+  { id:"e135", sport:"football", city:"rome", tier:"Serie A", home:"Lazio", away:"Genoa", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"14:00", status:"official", source:"Club box office", tag:"real", blurb:"Stadio Olimpico is shared with city rivals AS Roma — exact kickoff day confirmed as the weekend of 29-30 August, not independently pinned to the exact day/time by a second source.", lat:41.9339, lng:12.4547 },
+  { id:"e136", sport:"basketball", city:"barcelona", tier:"EuroLeague", home:"FC Barcelona", away:"Anadolu Efes Istanbul", venue:"Palau Blaugrana", area:"Les Corts", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"21:00", status:"official", source:"Club box office", tag:"real", blurb:"EuroLeague opening night.", lat:41.3809, lng:2.1183 },
+  { id:"e137", sport:"tennis", city:"paris", tier:"ATP Masters 1000", eventName:"Paris Masters", venue:"La Défense Arena", area:"Nanterre", date:"Mon 02 Nov", isoDate:"2026-11-02", time:"11:00", status:"official", source:"Club box office", tag:"real", blurb:"The final Masters 1000 event of the ATP season.", lat:48.8965, lng:2.2286 },
+  { id:"e138", sport:"golf", city:"paris", tier:"DP World Tour", eventName:"FedEx Open de France — Round 1", venue:"Le Golf National", area:"Saint-Quentin-en-Yvelines", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"08:00", status:"official", source:"Club box office", tag:"real", lat:48.7486, lng:2.0672 },
+  { id:"e139", sport:"snooker", city:"york", tier:"World Snooker Tour — Triple Crown", eventName:"UK Championship", venue:"York Barbican", area:"York", date:"Fri 27 Nov", isoDate:"2026-11-27", time:"10:00", status:"official", source:"Club box office", tag:"real", blurb:"Part of snooker's Triple Crown, alongside the Masters and World Championship.", lat:53.9576, lng:-1.0827 },
+  { id:"e140", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Saracens", venue:"Twickenham Stoop", area:"Twickenham", date:"Sun 25 Oct", isoDate:"2026-10-25", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.4556, lng:-0.3401 },
+  { id:"e141", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Leicester Tigers", venue:"Twickenham Stoop", area:"Twickenham", date:"Sat 05 Dec", isoDate:"2026-12-05", time:"15:05", status:"official", source:"Club box office", tag:"real", lat:51.4556, lng:-0.3401 },
+  { id:"e142", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Northampton Saints", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Mon 28 Dec", isoDate:"2026-12-28", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"\"The Big Game\" — Harlequins' marquee fixture, moved from their own Stoop ground to the much larger national stadium.", lat:51.4548, lng:-0.3417 },
+  { id:"e143", sport:"rugby", city:"london", tier:"Nations Championship", home:"England", away:"Japan", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 14 Nov", isoDate:"2026-11-14", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.4548, lng:-0.3417 },
+  { id:"e144", sport:"rugby", city:"london", tier:"Nations Championship", home:"England", away:"New Zealand", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 21 Nov", isoDate:"2026-11-21", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"England v the All Blacks.", lat:51.4548, lng:-0.3417 },
+  { id:"e145", sport:"darts", city:"london", tier:"PDC World Championship", eventName:"PDC World Darts Championship — Opening Night", venue:"Alexandra Palace", area:"Alexandra Park", date:"Fri 11 Dec", isoDate:"2026-12-11", time:"19:00", status:"official", source:"Club box office", tag:"real", blurb:"First year in Ally Pally's Great Hall, boosting capacity to over 5,200 per session.", lat:51.5941, lng:-0.1279 },
+  { id:"e146", sport:"snooker", city:"london", tier:"World Snooker Tour — Triple Crown", eventName:"The Masters — Day 1", venue:"Alexandra Palace", area:"Alexandra Park", date:"Sun 10 Jan", isoDate:"2027-01-10", time:"13:00", status:"official", source:"Club box office", tag:"real", blurb:"The second Triple Crown event of the season, following the UK Championship.", lat:51.5941, lng:-0.1279 },
+  { id:"e147", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Indianapolis Colts", away:"Washington Commanders", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sun 04 Oct", isoDate:"2026-10-04", time:"14:30", status:"official", source:"Club box office", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e148", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Philadelphia Eagles", away:"Jacksonville Jaguars", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"14:30", status:"official", source:"Club box office", tag:"real", lat:51.6043, lng:-0.0664 },
+  { id:"e149", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Jacksonville Jaguars", away:"Houston Texans", venue:"Wembley Stadium", area:"Wembley", date:"Sun 18 Oct", isoDate:"2026-10-18", time:"14:30", status:"official", source:"Club box office", tag:"real", blurb:"The Jaguars' 12th game at Wembley — back-to-back London home games across consecutive weekends.", lat:51.556, lng:-0.2795 },
+  { id:"e150", sport:"tennis", city:"london", tier:"Laver Cup", eventName:"Laver Cup — Day 1 (Team Europe v Team World)", venue:"The O2 Arena", area:"Greenwich Peninsula", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"12:30", status:"official", source:"Club box office", tag:"real", blurb:"9th edition — the O2 hosted this in 2022 for Roger Federer's retirement. Confirmed players include Carlos Alcaraz and Alexander Zverev (Team Europe) and Taylor Fritz and Alex de Minaur (Team World).", lat:51.503, lng:0.0032 },
+  { id:"e151", sport:"rugby", city:"dublin", tier:"Six Nations", home:"Ireland", away:"England", venue:"Aviva Stadium", area:"Ballsbridge", date:"Fri 05 Feb", isoDate:"2027-02-05", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Six Nations Round 1 opener.", lat:53.3352, lng:-6.2286 },
+  { id:"e152", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Italy", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 06 Feb", isoDate:"2027-02-06", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.235 },
+  { id:"e153", sport:"rugby", city:"paris", tier:"Six Nations", home:"France", away:"Wales", venue:"Stade de France", area:"Saint-Denis", date:"Sat 06 Feb", isoDate:"2027-02-06", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:48.9244, lng:2.3601 },
+  { id:"e154", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"Ireland", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 13 Feb", isoDate:"2027-02-13", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:41.9339, lng:12.4547 },
+  { id:"e155", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Wales", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 13 Feb", isoDate:"2027-02-13", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.235 },
+  { id:"e156", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"France", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sun 14 Feb", isoDate:"2027-02-14", time:"15:10", status:"official", source:"Club box office", tag:"real", blurb:"\"Le Crunch\" — England v France, on Valentine's Day.", lat:51.4548, lng:-0.3417 },
+  { id:"e157", sport:"rugby", city:"cardiff", tier:"Six Nations", home:"Wales", away:"Ireland", venue:"Principality Stadium", area:"Cardiff City Centre", date:"Sat 20 Feb", isoDate:"2027-02-20", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:51.4782, lng:-3.1826 },
+  { id:"e158", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"Italy", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 20 Feb", isoDate:"2027-02-20", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:51.4548, lng:-0.3417 },
+  { id:"e159", sport:"rugby", city:"paris", tier:"Six Nations", home:"France", away:"Scotland", venue:"Stade de France", area:"Saint-Denis", date:"Sun 21 Feb", isoDate:"2027-02-21", time:"15:10", status:"official", source:"Club box office", tag:"real", lat:48.9244, lng:2.3601 },
+  { id:"e160", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Ireland", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Fri 05 Mar", isoDate:"2027-03-05", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Six Nations' first-ever Friday night fixture at Murrayfield.", lat:55.9411, lng:-3.235 },
+  { id:"e161", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"France", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 06 Mar", isoDate:"2027-03-06", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:41.9339, lng:12.4547 },
+  { id:"e162", sport:"rugby", city:"cardiff", tier:"Six Nations", home:"Wales", away:"England", venue:"Principality Stadium", area:"Cardiff City Centre", date:"Sat 06 Mar", isoDate:"2027-03-06", time:"16:40", status:"official", source:"Club box office", tag:"real", blurb:"The Anglo-Welsh rivalry.", lat:51.4782, lng:-3.1826 },
+  { id:"e163", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"Wales", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"14:10", status:"official", source:"Club box office", tag:"real", blurb:"Super Saturday — the tournament's final round, three matches back to back.", lat:41.9339, lng:12.4547 },
+  { id:"e164", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"Scotland", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"16:40", status:"official", source:"Club box office", tag:"real", blurb:"The Calcutta Cup, on Super Saturday.", lat:51.4548, lng:-0.3417 },
+  { id:"e165", sport:"rugby", city:"dublin", tier:"Six Nations", home:"Ireland", away:"France", venue:"Aviva Stadium", area:"Ballsbridge", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Super Saturday's finale — potentially title-deciding.", lat:53.3352, lng:-6.2286 },
+  { id:"e166", sport:"snooker", city:"sheffield", tier:"World Snooker Tour — Triple Crown", eventName:"World Snooker Championship — Day 1", venue:"Crucible Theatre", area:"Sheffield City Centre", date:"Sat 17 Apr", isoDate:"2027-04-17", time:"10:00", status:"official", source:"Club box office", tag:"real", blurb:"The centenary edition — 51st consecutive year at the Crucible. The season's final and biggest Triple Crown event.", lat:53.3797, lng:-1.4659 },
+  { id:"e167", sport:"football", city:"london", tier:"FA Cup Final", eventName:"FA Cup Final 2027 (finalists TBC)", venue:"Wembley Stadium", area:"Wembley", date:"Sat 22 May", isoDate:"2027-05-22", time:"16:30", status:"official", source:"Club box office", tag:"real", blurb:"Finalists not yet determined — the competition is still ongoing. Date confirmed via Sky Sports' dedicated season-dates announcement, which took priority over a conflicting date (15 May) from a smaller ticketing site.", lat:51.556, lng:-0.2795 },
+  { id:"e168", sport:"football", city:"madrid", tier:"UEFA Champions League Final", eventName:"UEFA Champions League Final 2027 (finalists TBC)", venue:"Riyadh Air Metropolitano", area:"San Blas-Canillejas", date:"Sat 05 Jun", isoDate:"2027-06-05", time:"21:00", status:"official", source:"Club box office", tag:"real", blurb:"European club football's biggest match — finalists not yet determined.", lat:40.4362, lng:-3.5995 },
+  { id:"e169", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby Final", eventName:"Gallagher Premiership Rugby Final 2027 (finalists TBC)", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 19 Jun", isoDate:"2027-06-19", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"Confirmed directly via Premiership Rugby's own official site.", lat:51.4548, lng:-0.3417 },
+  { id:"e170", sport:"athletics", city:"london", tier:"Diamond League", eventName:"Novuna London Athletics Meet 2027", venue:"London Stadium", area:"Stratford", date:"Sat 17 Jul", isoDate:"2027-07-17", time:"11:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"2026 saw Josh Kerr break the men's mile world record here (3:42.66). New sport category — Athletics/Track & Field.", lat:51.5386, lng:-0.0165 },
+  { id:"e171", sport:"rugby", city:"cardiff", tier:"United Rugby Championship", home:"Cardiff Rugby", away:"Zebre Parma", venue:"Cardiff Arms Park", area:"Cardiff City Centre", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"Cardiff Rugby's first home fixture of their 150th-anniversary season.", lat:51.4816, lng:-3.1791 },
+  { id:"e172", sport:"icehockey", city:"dundee", tier:"Elite Ice Hockey League", home:"Dundee Stars", away:"Fife Flyers", venue:"Dundee Ice Arena", area:"Dundee", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"EIHL opening weekend.", lat:56.462, lng:-2.9707 },
+  { id:"e173", sport:"football", city:"dundee", tier:"Scottish Premiership", home:"Dundee", away:"Hibernian", venue:"Dens Park", area:"Dundee", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:56.4775, lng:-2.9713 },
+  { id:"e174", sport:"icehockey", city:"guildford", tier:"Elite Ice Hockey League", home:"Guildford Flames", away:"Sheffield Steelers", venue:"Guildford Spectrum", area:"Guildford", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"18:00", status:"official", source:"Club box office", tag:"real", blurb:"EIHL opening weekend.", lat:51.2461, lng:-0.5786 },
+  { id:"e175", sport:"icehockey", city:"kirkcaldy", tier:"Elite Ice Hockey League", home:"Fife Flyers", away:"Sheffield Steelers", venue:"Fife Ice Arena", area:"Kirkcaldy", date:"Sun 04 Oct", isoDate:"2026-10-04", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"Fife Flyers' first home Elite League fixture of the season.", lat:56.1165, lng:-3.1596 },
+  { id:"e176", sport:"rugby", city:"bayonne", tier:"Top 14", home:"Aviron Bayonnais", away:"RC Toulon", venue:"Stade Jean-Dauger", area:"Bayonne", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:43.4929, lng:-1.4749 },
+  { id:"e177", sport:"rugby", city:"bordeaux", tier:"Top 14", home:"Union Bordeaux-Bègles", away:"Racing 92", venue:"Stade Chaban-Delmas", area:"Bordeaux", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"21:15", status:"official", source:"Club box office", tag:"real", blurb:"Bordeaux-Bègles are the reigning back-to-back European (Champions Cup) champions.", lat:44.8386, lng:-0.6119 },
+  { id:"e178", sport:"rugby", city:"montpellier", tier:"Top 14", home:"Montpellier Hérault Rugby", away:"Section Paloise", venue:"GGL Stadium", area:"Montpellier", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:43.6229, lng:3.8122 },
+  { id:"e179", sport:"rugby", city:"castres", tier:"Top 14", home:"Castres Olympique", away:"RC Vannes", venue:"Stade Pierre-Antoine", area:"Castres", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:43.6047, lng:2.2461 },
+  { id:"e180", sport:"rugby", city:"lyon", tier:"Top 14", home:"LOU Rugby", away:"ASM Clermont Auvergne", venue:"Matmut Stadium de Gerland", area:"Lyon", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:45.7275, lng:4.8256 },
+  { id:"e181", sport:"rugby", city:"larochelle", tier:"Top 14", home:"Stade Rochelais", away:"Stade Toulousain", venue:"Stade Marcel-Deflandre", area:"La Rochelle", date:"Sun 06 Sep", isoDate:"2026-09-06", time:"21:05", status:"official", source:"Club box office", tag:"real", blurb:"Reigning champions Toulouse travel to the two-time Champions Cup winners.", lat:46.1487, lng:-1.1518 },
+  { id:"e182", sport:"rugby", city:"paris", tier:"Top 14", home:"Stade Français Paris", away:"USA Perpignan", venue:"Stade Jean-Bouin", area:"Paris", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", blurb:"Paris' 3rd sport in the dataset, alongside tennis (Paris Masters) and golf (FedEx Open de France).", lat:48.8412, lng:2.2531 },
+  { id:"e183", sport:"basketball", city:"lyon", tier:"EuroLeague", home:"LDLC ASVEL Villeurbanne", away:"Maccabi Tel Aviv", venue:"Astroballe", area:"Villeurbanne", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"20:45", status:"official", source:"Club box office", tag:"real", lat:45.7728, lng:4.8797 },
+  { id:"e184", sport:"rugby", city:"gloucester", tier:"Investec Champions Cup", home:"Gloucester Rugby", away:"Union Bordeaux-Bègles", venue:"Kingsholm Stadium", area:"Gloucester", date:"Fri 16 Oct", isoDate:"2026-10-16", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"Champions Cup Round 1 — the reigning back-to-back champions' title defence opens away at Kingsholm.", lat:51.8683, lng:-2.2493 },
+];
+
+const STATUS_LABEL = { official:"Buy — official", club_platform:"Buy — club platform", free_gate:"Free / pay on gate", sold_out:"Sold out" };
+const STATUS_COLOR = { official:"#2F6F4F", club_platform:"#4A7FB5", free_gate:"#8A8578", sold_out:"#B4483C" };
+// "real" is deliberately NOT rendered here — every event in the dataset
+// is real now (100%, no exceptions), so the badge stopped carrying any
+// information a long time ago and was just visual clutter on every card.
+// Kept 'live'/'demo' ready in case either is ever needed again.
+const TAG_BADGE = { real:'', live:'<span class="badge-live">● LIVE</span>', demo:'<span class="badge-demo">DEMO</span>' };
+
+let state = { sports:new Set(Object.keys(SPORTS)), countries:new Set(Object.values(CITIES).map(c => c.country)), view:"map", showSaved:false, search:"", date:"" };
+// Computed once when the page loads, using the REAL current date (not a
+// hardcoded value) — this is what makes "past events disappear as the days
+// go on" actually true over time, rather than true only on the day this
+// was written.
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+
+// ---------------------------------------------------------------------------
+// BACKEND CONNECTION
+// Leave API_BASE empty to run in standalone demo mode (matches the earlier
+// prototype exactly — local mock data, in-memory-only accounts).
+// Set it to your deployed backend's URL (e.g. "https://fixture-api.onrender.com")
+// to connect to the real Node backend in /backend — real accounts, real
+// password hashing, real persistence to disk, shared across anyone using
+// that same deployed URL.
+// ---------------------------------------------------------------------------
+const API_BASE = ""; // <-- set this after deploying /backend, e.g. "https://your-app.onrender.com"
+let usingBackend = false;
+let authToken = null; // NOT persisted to disk/localStorage on purpose — see README
+
+let USERS = [];        // only used in standalone mode: { name, email, password, saved: Set() }
+let currentUser = null;
+let authMode = "login"; // or "register"
+let authError = "";
+
+// Every dynamic value below gets inserted via innerHTML template literals
+// for simplicity, which means anything user-supplied (currently: account
+// name and email) MUST be escaped before interpolation, or a name like
+// <img src=x onerror=alert(1)> would execute as real HTML. Event data isn't
+// user-generated today, but is escaped too on the assumption a future admin
+// CMS (per the backend architecture doc) will make it editable content.
+function esc(str){
+  return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+// Strips accents/diacritics so "atletico" matches "Atlético", "munchen"
+// matches "München", etc. — important now that the dataset includes
+// non-UK cities/teams, and only going to matter more as this expands
+// further across Europe.
+function normalizeText(str){
+  return String(str ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+function title(ev){ return ev.eventName || `${ev.home} v ${ev.away}`; }
+function filteredEvents(){
+  const searching = state.search.trim().length > 0;
+  let list;
+  if (state.showSaved) {
+    const savedIds = currentUser ? currentUser.saved : new Set();
+    list = EVENTS.filter(e => savedIds.has(e.id) && state.sports.has(e.sport) && state.countries.has(CITIES[e.city].country));
+  } else {
+    // No city selector anymore — every event is always in scope, everywhere.
+    // Narrowing down to a specific place is what search and "near me" are for.
+    list = EVENTS.filter(e => state.sports.has(e.sport) && state.countries.has(CITIES[e.city].country));
+  }
+  // Fixtures before today are out of date and hidden automatically — this
+  // re-evaluates against the real date every time the page loads, so it
+  // stays correct as days pass rather than needing manual upkeep.
+  list = list.filter(e => e.isoDate >= TODAY_ISO);
+  if (state.date) {
+    list = list.filter(e => e.isoDate === state.date);
+  }
+  if (searching) {
+    // Match each typed word independently (AND, any order) rather than the
+    // whole query as one contiguous substring — "chelsea arsenal" now finds
+    // "Arsenal v Chelsea" even though the words appear in the opposite order.
+    const terms = normalizeText(state.search.trim()).split(/\s+/).filter(Boolean);
+    list = list.filter(e => {
+      const haystack = normalizeText([title(e), e.venue, e.area, e.tier, CITIES[e.city].name, CITIES[e.city].country, SPORTS[e.sport].name].filter(Boolean).join(' '));
+      return terms.every(term => haystack.includes(term));
+    });
+  }
+  return list;
+}
+
+
+// Computes how many events each sport contributes under the CURRENT
+// filters (date/search/saved/location) but deliberately ignoring the sport
+// filter itself — this is what lets the sport-selection sheet only list
+// sports that actually have something to show right now, rather than
+// always listing all of them regardless of relevance.
+function sportEventCounts(){
+  const searching = state.search.trim().length > 0;
+  let base;
+  if (state.showSaved) {
+    const savedIds = currentUser ? currentUser.saved : new Set();
+    base = EVENTS.filter(e => savedIds.has(e.id));
+  } else {
+    base = EVENTS.slice();
+  }
+  base = base.filter(e => state.countries.has(CITIES[e.city].country));
+  base = base.filter(e => e.isoDate >= TODAY_ISO);
+  if (state.date) base = base.filter(e => e.isoDate === state.date);
+  if (searching) {
+    const terms = normalizeText(state.search.trim()).split(/\s+/).filter(Boolean);
+    base = base.filter(e => {
+      const haystack = normalizeText([title(e), e.venue, e.area, e.tier, CITIES[e.city].name, CITIES[e.city].country, SPORTS[e.sport].name].filter(Boolean).join(' '));
+      return terms.every(term => haystack.includes(term));
+    });
+  }
+  const counts = {};
+  base.forEach(e => { counts[e.sport] = (counts[e.sport] || 0) + 1; });
+  return counts;
+}
+
+function renderSportsButton(){
+  document.getElementById('sportsBtnLabel').textContent = `Sports (${state.sports.size})`;
+}
+
+function openSportSheet(){
+  const counts = sportEventCounts();
+  // Only sports with at least one matching event right now get listed —
+  // this is the actual decluttering: an empty-handed sport (e.g. Netball
+  // with a date filter that has none) doesn't clutter the sheet.
+  const relevantSportIds = Object.keys(SPORTS).filter(id => counts[id] > 0);
+  const host = document.getElementById('sportSheetHost');
+  const rows = relevantSportIds.map(id => {
+    const s = SPORTS[id];
+    const on = state.sports.has(id);
+    return `
+      <div class="sport-sheet-row" data-sport="${id}">
+        <div class="meta"><span class="dot" style="background:${s.color};"></span>${esc(s.name)} <span class="count">(${counts[id]})</span></div>
+        <div class="sport-check ${on ? 'on' : 'off'}">${on ? '✓' : ''}</div>
+      </div>`;
+  }).join('');
+  const emptyNote = relevantSportIds.length === 0 ? `<p class="note">No sports have matching events under your current filters.</p>` : '';
+  host.innerHTML = `
+    <div class="scrim" id="sportScrim">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-top">
+          <div class="sheet-title">Filter by sport</div>
+          <button class="sheet-close" id="sportSheetClose">✕</button>
+        </div>
+        <div style="display:flex; gap:16px; margin:-6px 0 8px;">
+          <button class="sheet-link" id="sportSelectAll">Select all</button>
+          <button class="sheet-link" id="sportClearAll">Clear all</button>
+        </div>
+        ${rows}
+        ${emptyNote}
+        <button class="cta" id="sportSheetDone" style="background:#10151F; color:#FFB100; margin-top:14px;">Show ${filteredEvents().length} events</button>
+      </div>
+    </div>`;
+  document.getElementById('sportScrim').onclick = closeSportSheet;
+  document.getElementById('sportSheetClose').onclick = closeSportSheet;
+  document.getElementById('sportSelectAll').onclick = () => {
+    // Deliberately selects ALL sports, not just the ones currently listed —
+    // "Select all" should mean everything, predictably, regardless of
+    // what's visible right now under other filters.
+    Object.keys(SPORTS).forEach(id => state.sports.add(id));
+    openSportSheet(); renderSportsButton(); renderActiveFilters();
+  };
+  document.getElementById('sportClearAll').onclick = () => {
+    // Full reset to empty, not just the visible/relevant sports — otherwise
+    // a sport hidden by the current filters (zero matching events right
+    // now) could stay silently selected, and "Clear all" would misleadingly
+    // not mean zero.
+    state.sports.clear();
+    openSportSheet(); renderSportsButton(); renderActiveFilters();
+  };
+  host.querySelectorAll('[data-sport]').forEach(row => {
+    row.onclick = () => {
+      const id = row.dataset.sport;
+      state.sports.has(id) ? state.sports.delete(id) : state.sports.add(id);
+      openSportSheet(); // re-render the sheet in place so the checkbox updates immediately
+      renderSportsButton();
+      renderActiveFilters();
+    };
+  });
+  document.getElementById('sportSheetDone').onclick = () => { closeSportSheet(); renderAll(); };
+}
+function closeSportSheet(){ document.getElementById('sportSheetHost').innerHTML = ''; }
+document.getElementById('sportsBtn').onclick = openSportSheet;
+
+// Country filter — deliberately mirrors the sport filter above exactly
+// (same button/sheet/select-all/clear-all pattern) for consistency, now
+// that the dataset spans 7 countries rather than just the UK.
+function countryEventCounts(){
+  const searching = state.search.trim().length > 0;
+  let base;
+  if (state.showSaved) {
+    const savedIds = currentUser ? currentUser.saved : new Set();
+    base = EVENTS.filter(e => savedIds.has(e.id));
+  } else {
+    base = EVENTS.slice();
+  }
+  base = base.filter(e => state.sports.has(e.sport));
+  base = base.filter(e => e.isoDate >= TODAY_ISO);
+  if (state.date) base = base.filter(e => e.isoDate === state.date);
+  if (searching) {
+    const terms = normalizeText(state.search.trim()).split(/\s+/).filter(Boolean);
+    base = base.filter(e => {
+      const haystack = normalizeText([title(e), e.venue, e.area, e.tier, CITIES[e.city].name, CITIES[e.city].country, SPORTS[e.sport].name].filter(Boolean).join(' '));
+      return terms.every(term => haystack.includes(term));
+    });
+  }
+  const counts = {};
+  base.forEach(e => { const c = CITIES[e.city].country; counts[c] = (counts[c] || 0) + 1; });
+  return counts;
+}
+
+function renderCountryButton(){
+  const allCountries = [...new Set(Object.values(CITIES).map(c => c.country))];
+  document.getElementById('countryBtnLabel').textContent = `Countries (${state.countries.size})`;
+}
+
+function openCountrySheet(){
+  const counts = countryEventCounts();
+  const allCountries = [...new Set(Object.values(CITIES).map(c => c.country))];
+  const relevantCountries = allCountries.filter(c => counts[c] > 0);
+  const host = document.getElementById('countrySheetHost');
+  const rows = relevantCountries.map(country => {
+    const on = state.countries.has(country);
+    return `
+      <div class="sport-sheet-row" data-country="${esc(country)}">
+        <div class="meta">${esc(country)} <span class="count">(${counts[country]})</span></div>
+        <div class="sport-check ${on ? 'on' : 'off'}">${on ? '✓' : ''}</div>
+      </div>`;
+  }).join('');
+  const emptyNote = relevantCountries.length === 0 ? `<p class="note">No countries have matching events under your current filters.</p>` : '';
+  host.innerHTML = `
+    <div class="scrim" id="countryScrim">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-top">
+          <div class="sheet-title">Filter by country</div>
+          <button class="sheet-close" id="countrySheetClose">✕</button>
+        </div>
+        <div style="display:flex; gap:16px; margin:-6px 0 8px;">
+          <button class="sheet-link" id="countrySelectAll">Select all</button>
+          <button class="sheet-link" id="countryClearAll">Clear all</button>
+        </div>
+        ${rows}
+        ${emptyNote}
+        <button class="cta" id="countrySheetDone" style="background:#10151F; color:#FFB100; margin-top:14px;">Show ${filteredEvents().length} events</button>
+      </div>
+    </div>`;
+  document.getElementById('countryScrim').onclick = closeCountrySheet;
+  document.getElementById('countrySheetClose').onclick = closeCountrySheet;
+  document.getElementById('countrySelectAll').onclick = () => {
+    [...new Set(Object.values(CITIES).map(c => c.country))].forEach(c => state.countries.add(c));
+    openCountrySheet(); renderCountryButton(); renderActiveFilters();
+  };
+  document.getElementById('countryClearAll').onclick = () => {
+    state.countries.clear();
+    openCountrySheet(); renderCountryButton(); renderActiveFilters();
+  };
+  host.querySelectorAll('[data-country]').forEach(row => {
+    row.onclick = () => {
+      const c = row.dataset.country;
+      state.countries.has(c) ? state.countries.delete(c) : state.countries.add(c);
+      openCountrySheet();
+      renderCountryButton();
+      renderActiveFilters();
+    };
+  });
+  document.getElementById('countrySheetDone').onclick = () => { closeCountrySheet(); renderAll(); };
+}
+function closeCountrySheet(){ document.getElementById('countrySheetHost').innerHTML = ''; }
+document.getElementById('countryBtn').onclick = openCountrySheet;
+
+function statusPillHtml(status){
+  return `<span class="pill" style="color:${STATUS_COLOR[status]}; border:1px solid ${STATUS_COLOR[status]};">${STATUS_LABEL[status]}</span>`;
+}
+
+// Rough center of England — just a sane starting view before any markers
+// exist. renderMap()'s auto-fit-bounds logic immediately overrides this
+// once real events are loaded, so precision here doesn't matter much.
+const FALLBACK_MAP_CENTER = [52.8, -1.6];
+let userLocation = null; // { lat, lng } once the user grants location access
+let userMarker = null;
+
+function distanceKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function locateMe(){
+  const btn = document.getElementById('locateBtn');
+  const label = document.getElementById('mapLabel');
+  if (!navigator.geolocation){
+    if (label) { label.textContent = 'Location not supported on this device'; setTimeout(() => { if(label) label.textContent = 'tap a pin'; }, 3000); }
+    return;
+  }
+  if (label) label.textContent = 'Finding you…';
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (btn) btn.classList.add('active');
+      if (leafletMap){
+        if (userMarker) leafletMap.removeLayer(userMarker);
+        userMarker = L.marker([userLocation.lat, userLocation.lng], {
+          icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [14,14], iconAnchor: [7,7] }),
+          zIndexOffset: 1000,
+        }).addTo(leafletMap).bindPopup('You are here');
+        leafletMap.setView([userLocation.lat, userLocation.lng], 13);
+      }
+      renderAll();
+    },
+    (err) => {
+      if (label){ label.textContent = err.code === 1 ? 'Location permission denied' : 'Location unavailable'; setTimeout(() => { if(label) label.textContent = 'tap a pin'; }, 3000); }
+    },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+let leafletMap = null;
+let leafletMarkers = [];
+let leafletTileLayer = null;
+let theme = 'dark';
+const TILE_URLS = {
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = theme === 'dark' ? '🌙' : '☀️';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#10151F' : '#F7F5EF');
+  if (leafletTileLayer) leafletTileLayer.setUrl(TILE_URLS[theme]);
+}
+function toggleTheme(){
+  theme = theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+}
+document.getElementById('themeBtn').onclick = toggleTheme;
+
+let leafletFailed = false;
+
+function fileOriginHint(){
+  if (location.protocol === 'file:'){
+    return `<span style="max-width:280px; display:inline-block;">
+      Map can't load because this page was opened as a local file — Safari and most mobile browsers block maps from loading when a page isn't actually hosted online, even though the rest of the app works fine without internet access.
+      <br><br>
+      <b>Fix:</b> host this file somewhere (even a free static host takes under a minute — see the README) and open it via that link instead of tapping the downloaded file. List view will keep working either way.
+    </span>`;
+  }
+  return `<span>Map couldn't load — check your connection. List view still works below.</span>`;
+}
+
+function ensureLeafletMap(){
+  if (leafletMap || leafletFailed) return;
+  const el = document.getElementById('mapView');
+  if (typeof L === 'undefined'){
+    // Leaflet's CDN script didn't load. The single most common real-world
+    // cause: the page was opened by tapping a downloaded file directly
+    // (file:// origin), and Safari/mobile browsers deliberately restrict
+    // local files from loading external resources as a security measure —
+    // list view still works because it needs nothing from the internet;
+    // the map does, and that's exactly what's being blocked. Detecting
+    // this case specifically means the message can say what to actually do
+    // about it, rather than a generic "check your connection."
+    leafletFailed = true;
+    el.innerHTML = `<div class="map-canvas"><div class="empty">${fileOriginHint()}</div></div>`;
+    return;
+  }
+  try{
+    el.innerHTML = `<div class="map-canvas"><div id="leafletMap"></div><div class="map-label" id="mapLabel">tap a pin</div><button class="locate-btn" id="locateBtn" title="Use my location">◎</button><div class="empty" id="mapEmpty" style="display:none;"><span></span></div></div>`;
+    leafletMap = L.map('leafletMap', { zoomControl: false }).setView(FALLBACK_MAP_CENTER, 6);
+    L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
+    // CartoDB's free tiles — dark or light variant depending on the app's
+    // current theme, rather than always using OSM's default light style.
+    // Same OSM data underneath either way, no API key required.
+    leafletTileLayer = L.tileLayer(TILE_URLS[theme], {
+      maxZoom: 19,
+      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    }).addTo(leafletMap);
+    document.getElementById('locateBtn').onclick = locateMe;
+  }catch(err){
+    console.error('Map init failed:', err);
+    leafletFailed = true;
+    el.innerHTML = `<div class="map-canvas"><div class="empty">${fileOriginHint()}</div></div>`;
+  }
+}
+
+function renderMap(){
+  ensureLeafletMap();
+  if (leafletFailed || !leafletMap) return; // fallback message already shown; nothing more to render
+  const emptyEl = document.getElementById('mapEmpty');
+  leafletMarkers.forEach(m => leafletMap.removeLayer(m));
+  leafletMarkers = [];
+
+  if (loadingEvents){
+    emptyEl.style.display = 'flex';
+    emptyEl.querySelector('span').textContent = 'Loading events…';
+    return;
+  }
+  const evs = filteredEvents();
+  // The map simply shows whatever filteredEvents() returns — same source
+  // of truth as list view. Empty only happens when filters genuinely
+  // produce zero results (e.g. every sport deselected), never just
+  // because nothing happens to be narrowed down. A previous version
+  // deliberately hid all pins by default (with everything selected,
+  // hasActiveNarrowing() was false) to avoid an "overwhelming" full-map
+  // view — but that meant opening the app fresh, with every sport and
+  // country selected, showed an empty map for no real reason. Reverted.
+  if (evs.length === 0){
+    emptyEl.style.display = 'flex';
+    emptyEl.querySelector('span').textContent = state.showSaved
+      ? 'No saved events yet — tap ♥ on any event to save it.'
+      : 'No events match your filters here yet.';
+    return;
+  }
+
+  // Multiple upcoming fixtures often share a venue (a stadium hosting
+  // several matches across the window) — plotting one pin per event would
+  // stack them exactly on top of each other at that venue's coordinates.
+  // Group by venue, keep only the soonest event as the pin, and badge it
+  // with a count so it's clear there's more to see — the list view (using
+  // the same filteredEvents(), unmodified) still shows every fixture.
+  const byVenue = new Map();
+  evs.forEach(ev => {
+    const existing = byVenue.get(ev.venue);
+    if (!existing) { byVenue.set(ev.venue, { soonest: ev, count: 1 }); return; }
+    existing.count += 1;
+    const evKey = ev.isoDate + ev.time, exKey = existing.soonest.isoDate + existing.soonest.time;
+    if (evKey < exKey) existing.soonest = ev;
+  });
+
+  byVenue.forEach(({ soonest: ev, count }) => {
+    const color = SPORTS[ev.sport].color;
+    const badge = count > 1
+      ? `<div style="position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:#10151F; color:#FFB100; font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; display:flex; align-items:center; justify-content:center; border:1.5px solid #FFB100;">${count}</div>`
+      : '';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="position:relative;"><div class="pin-dot" style="width:18px;height:18px;background:${color};"></div>${badge}</div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+    const label = count > 1 ? `${title(ev)} (+${count - 1} more here)` : title(ev);
+    const marker = L.marker([ev.lat, ev.lng], { icon, title: label }).addTo(leafletMap);
+    // Deliberately no popup here — tapping a pin goes straight to the same
+    // full detail sheet used by list cards, rather than showing a small
+    // popup bubble AND the sheet at once (which is what used to happen:
+    // both were wired to the same click, which looked confusing/broken).
+    marker.on('click', () => openSheet(ev.id));
+    leafletMarkers.push(marker);
+  });
+
+  // Auto-fit the map to whatever's actually visible, rather than staying at
+  // a fixed city-wide zoom — a filtered-down set of 2 events on one side of
+  // town shouldn't leave the map showing mostly empty space.
+  const bounds = L.latLngBounds(evs.map(e => [e.lat, e.lng]));
+  if (userLocation) bounds.extend([userLocation.lat, userLocation.lng]);
+  leafletMap.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+  emptyEl.style.display = 'none';
+}
+
+function isSaved(id){ return currentUser && currentUser.saved.has(id); }
+
+function renderList(){
+  const el = document.getElementById('listView');
+  if (loadingEvents){ el.innerHTML = `<div class="empty" style="position:static; padding-top:60px;"><span>Loading events…</span></div>`; return; }
+  const evs = filteredEvents().slice().sort((a, b) => {
+    if (userLocation){
+      return distanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) - distanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng);
+    }
+    // Sort by the real ISO date + time, not the display string ("Sat 05
+    // Sep") — comparing display strings alphabetically sorts by day-name
+    // (Fri/Mon/Sat/Sun...) rather than by actual date, which is why this
+    // wasn't chronological before.
+    return (a.isoDate + a.time).localeCompare(b.isoDate + b.time);
+  });
+  if (evs.length===0){
+    el.innerHTML = `<div class="empty" style="position:static; padding-top:60px;"><span>${state.showSaved ? "No saved events yet — tap ♥ on any event to save it." : "No events match your filters here yet."}</span></div>`;
+    return;
+  }
+  let html = `<div class="list">`;
+  const showCity = true; // no city selector anymore — always show which city each event is in
+  evs.forEach(ev => {
+    const s = SPORTS[ev.sport];
+    html += `
+      <div class="card" data-id="${ev.id}">
+        <button class="save-btn" data-save="${ev.id}">${isSaved(ev.id) ? '♥' : '♡'}</button>
+        <div class="card-top">
+          <div>
+            <div class="card-sport" style="color:${s.color}">${esc(s.name)} · ${esc(ev.tier)}</div>
+            <div class="card-title">${esc(title(ev))}</div>
+          </div>
+          <span class="card-dot" style="background:${s.color}"></span>
+        </div>
+        <div class="card-meta">
+          <span>📍 ${esc(ev.venue)}, ${esc(ev.area)}${showCity ? ` · ${esc(CITIES[ev.city].name)}` : ''}</span>
+          <span>🕒 ${esc(ev.date)}, ${esc(ev.time)} ${getTzLabel(ev.city, ev.isoDate)}</span>
+          ${userLocation ? `<span>📏 ${distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng).toFixed(1)} km</span>` : ''}
+        </div>
+        <div style="display:flex; align-items:center;">
+          ${statusPillHtml(ev.status)}
+          ${TAG_BADGE[ev.tag]}
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+  el.querySelectorAll('.card').forEach(c => c.onclick = (e) => { if(e.target.dataset.save) return; openSheet(c.dataset.id); });
+  el.querySelectorAll('[data-save]').forEach(b => b.onclick = (e) => { e.stopPropagation(); toggleSave(b.dataset.save); });
+}
+
+async function toggleSave(id){
+  if(!currentUser){ openAuth('login', "Log in to save events."); return; }
+  if (usingBackend){
+    try{
+      const res = await fetch(`${API_BASE}/api/favorites/${id}`, { method:"POST", headers:{ Authorization:`Bearer ${authToken}` } });
+      const data = await res.json();
+      currentUser.saved = new Set(data.favorites || []);
+    }catch(err){ console.error(err); }
+  } else {
+    currentUser.saved.has(id) ? currentUser.saved.delete(id) : currentUser.saved.add(id);
+  }
+  renderAll();
+}
+
+function openSheet(id){
+  const ev = EVENTS.find(e => e.id===id);
+  const s = SPORTS[ev.sport];
+  const ctaLabel = { official:"Continue to official retailer", club_platform:"Continue to club ticketing", free_gate:"Free entry — no ticket needed", sold_out:"Sold out" }[ev.status];
+  const ctaStyle = ev.status==="sold_out" ? "background:#D8D2C2; color:#8A8578;" : "background:#10151F; color:#FFB100;";
+  document.getElementById('sheetHost').innerHTML = `
+    <div class="scrim" id="scrim">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-top">
+          <div>
+            <div class="sheet-sport" style="color:${s.color}">${esc(s.name)} · ${esc(ev.tier)}</div>
+            <div class="sheet-title">${esc(title(ev))}</div>
+          </div>
+          <button class="sheet-close" id="closeSheet">✕</button>
+        </div>
+        <div class="sheet-meta">
+          <span>📍 ${esc(ev.venue)}, ${esc(ev.area)} · ${esc(CITIES[ev.city].name)}</span>
+          <span>🕒 ${esc(ev.date)} · Start ${esc(ev.time)} ${getTzLabel(ev.city, ev.isoDate)}</span>
+          ${userLocation ? `<span>📏 ${distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng).toFixed(1)} km from you</span>` : ''}
+        </div>
+        ${ev.blurb ? `<p class="sheet-blurb">${esc(ev.blurb)}</p>` : ''}
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${statusPillHtml(ev.status)}
+          ${TAG_BADGE[ev.tag]}
+          ${ev.source ? `<span class="sheet-source">via ${esc(ev.source)}</span>` : ''}
+        </div>
+        <button class="cta" id="saveFromSheet" style="background:transparent; color:#10151F; border:1px solid rgba(0,0,0,0.15);">${isSaved(ev.id) ? '♥ Saved' : '♡ Save this event'}</button>
+        <button class="cta" style="${ctaStyle}">🎟 ${ctaLabel}</button>
+      </div>
+    </div>`;
+  document.getElementById('scrim').onclick = closeSheet;
+  document.getElementById('closeSheet').onclick = closeSheet;
+  document.getElementById('saveFromSheet').onclick = () => { toggleSave(id); openSheet(id); };
+}
+function closeSheet(){ document.getElementById('sheetHost').innerHTML = ''; }
+
+// ---- Auth UI ----
+function openAuth(mode, message){
+  authMode = mode || "login";
+  authError = message || "";
+  renderAuth();
+}
+function closeAuth(){ document.getElementById('authHost').innerHTML = ''; }
+
+function renderAuth(){
+  const host = document.getElementById('authHost');
+  if (currentUser){
+    host.innerHTML = `
+      <div class="scrim" id="authScrim">
+        <div class="sheet" onclick="event.stopPropagation()">
+          <div class="sheet-top">
+            <div class="sheet-title">Your profile</div>
+            <button class="sheet-close" id="authClose">✕</button>
+          </div>
+          <div class="profile-row">
+            <div class="profile-avatar">${esc(currentUser.name.charAt(0).toUpperCase())}</div>
+            <div>
+              <div class="profile-name">${esc(currentUser.name)}</div>
+              <div class="profile-email">${esc(currentUser.email)}</div>
+            </div>
+          </div>
+          <button class="menu-item" id="viewSaved">♥ Saved events (${currentUser.saved.size})</button>
+          <button class="menu-item danger" id="logoutBtn">Log out</button>
+          <p class="note">${usingBackend
+            ? "Connected to a real backend — your account and saved events are genuinely persisted on the server. You'll need to log in again after reloading this page, since the login token is deliberately kept in memory only, not saved to this device."
+            : "This is a demo account — it only exists in this browser tab's memory and disappears on reload. Set API_BASE at the top of the script to connect a real backend (see /backend and the README)."}</p>
+        </div>
+      </div>`;
+    document.getElementById('authScrim').onclick = closeAuth;
+    document.getElementById('authClose').onclick = closeAuth;
+    document.getElementById('logoutBtn').onclick = () => { currentUser = null; authToken = null; closeAuth(); renderAll(); };
+    document.getElementById('viewSaved').onclick = () => { state.showSaved = true; closeAuth(); renderAll(); setView('list'); };
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="scrim" id="authScrim">
+      <div class="sheet" onclick="event.stopPropagation()">
+        <div class="sheet-top">
+          <div class="sheet-title">${authMode==='login' ? 'Log in' : 'Create account'}</div>
+          <button class="sheet-close" id="authClose">✕</button>
+        </div>
+        <div class="auth-tabs">
+          <button class="auth-tab ${authMode==='login'?'active':''}" id="tabLogin">Log in</button>
+          <button class="auth-tab ${authMode==='register'?'active':''}" id="tabRegister">Register</button>
+        </div>
+        ${authMode==='register' ? `<div class="field"><label>Name</label><input id="fName" type="text" placeholder="Alex Morgan"></div>` : ''}
+        <div class="field"><label>Email</label><input id="fEmail" type="email" placeholder="you@example.com"></div>
+        <div class="field"><label>Password</label><input id="fPass" type="password" placeholder="••••••••"></div>
+        ${authError ? `<div class="auth-error">${authError}</div>` : ''}
+        <button class="cta" id="authSubmit" style="background:#10151F; color:#FFB100;">${authMode==='login' ? 'Log in' : 'Create account'}</button>
+        <p class="note">${usingBackend ? "Connected to a real backend — registering creates a genuine, persisted account." : "Demo only — accounts live in memory for this session and are not saved anywhere real. Set API_BASE at the top of the script to connect a real backend."}</p>
+      </div>
+    </div>`;
+  document.getElementById('authScrim').onclick = closeAuth;
+  document.getElementById('authClose').onclick = closeAuth;
+  document.getElementById('tabLogin').onclick = () => openAuth('login');
+  document.getElementById('tabRegister').onclick = () => openAuth('register');
+  document.getElementById('authSubmit').onclick = submitAuth;
+}
+
+async function submitAuth(){
+  const email = document.getElementById('fEmail').value.trim().toLowerCase();
+  const pass = document.getElementById('fPass').value;
+  if (!email || !pass){ authError = "Enter an email and password."; renderAuth(); return; }
+
+  if (usingBackend){
+    try{
+      if (authMode === 'register'){
+        const name = document.getElementById('fName').value.trim();
+        if (!name){ authError = "Enter your name."; renderAuth(); return; }
+        const res = await fetch(`${API_BASE}/api/register`, {
+          method:"POST", headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ name, email, password: pass }),
+        });
+        const data = await res.json();
+        if (!res.ok){ authError = data.error || "Registration failed."; renderAuth(); return; }
+        authToken = data.token;
+        currentUser = { ...data.user, saved: new Set(data.user.favorites || []) };
+      } else {
+        const res = await fetch(`${API_BASE}/api/login`, {
+          method:"POST", headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ email, password: pass }),
+        });
+        const data = await res.json();
+        if (!res.ok){ authError = data.error || "Login failed."; renderAuth(); return; }
+        authToken = data.token;
+        currentUser = { ...data.user, saved: new Set(data.user.favorites || []) };
+      }
+      closeAuth();
+      renderAll();
+    }catch(err){
+      authError = "Couldn't reach the backend. Check API_BASE is set correctly.";
+      renderAuth();
+    }
+    return;
+  }
+
+  // Standalone demo mode — in-memory only, no backend configured
+  if (authMode === 'register'){
+    const name = document.getElementById('fName').value.trim();
+    if (!name){ authError = "Enter your name."; renderAuth(); return; }
+    if (USERS.find(u => u.email === email)){ authError = "An account with that email already exists — try logging in instead."; renderAuth(); return; }
+    const user = { name, email, password: pass, saved: new Set() };
+    USERS.push(user);
+    currentUser = user;
+    closeAuth();
+    renderAll();
+  } else {
+    const user = USERS.find(u => u.email === email && u.password === pass);
+    if (!user){ authError = "No matching account in this session. Accounts reset on reload — try registering."; renderAuth(); return; }
+    currentUser = user;
+    closeAuth();
+    renderAll();
+  }
+}
+
+document.getElementById('avatarBtn').onclick = () => openAuth(currentUser ? 'profile' : 'login');
+
+function setView(v){
+  state.view = v;
+  document.getElementById('mapBtn').classList.toggle('active', v==='map');
+  document.getElementById('listBtn').classList.toggle('active', v==='list');
+  document.getElementById('mapView').style.display = v==='map' ? 'block' : 'none';
+  document.getElementById('listView').style.display = v==='list' ? 'block' : 'none';
+  // Leaflet miscalculates its size if initialized (or resized) while its
+  // container was display:none — invalidateSize() fixes the grey/broken
+  // tile rendering that would otherwise happen when switching back to Map.
+  if (v==='map' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
+}
+document.getElementById('mapBtn').onclick = () => setView('map');
+// Shared by the search box, date input, active-filter pill "✕" buttons, and
+// "Clear all". Data is always the full all-cities dataset now (loaded once
+// at startup), so changing search/date is purely a client-side re-filter —
+// no fetch-switching needed here anymore now that there's no per-city vs.
+// all-cities distinction to manage.
+function setSearchAndDate(newSearch, newDate){
+  state.search = newSearch;
+  state.date = newDate;
+  document.getElementById('searchInput').value = newSearch;
+  document.getElementById('dateInput').value = newDate;
+  renderAll();
+}
+
+document.getElementById('searchInput').oninput = (e) => setSearchAndDate(e.target.value, state.date);
+document.getElementById('dateInput').onchange = (e) => setSearchAndDate(state.search, e.target.value);
+document.getElementById('listBtn').onclick = () => setView('list');
+document.getElementById('savedBtn').onclick = async () => {
+  const turningOn = !state.showSaved;
+  if (turningOn && !currentUser){
+    openAuth('login', "Log in to see your saved events.");
+    return;
+  }
+  state.showSaved = turningOn;
+  document.getElementById('savedBtn').classList.toggle('active', state.showSaved);
+  if (usingBackend && state.showSaved && currentUser){
+    try{
+      const res = await fetch(`${API_BASE}/api/events?saved=true`, { headers:{ Authorization:`Bearer ${authToken}` } });
+      if (res.ok) EVENTS = await res.json();
+    }catch(err){ console.error(err); }
+  } else if (usingBackend && !state.showSaved){
+    loadAllEvents();
+    return;
+  }
+  renderAll();
+};
+
+// Every displayed time is the TRUE LOCAL TIME AT THE VENUE — this is the
+// sports-media convention (kickoff times are always stated in local time
+// by clubs, broadcasters, and ticket sites, never converted to the
+// reader's own timezone), not just a display shortcut. This function
+// labels each time with its timezone abbreviation so a cross-city list
+// mixing e.g. London and Barcelona fixtures is unambiguous. UK/Ireland
+// and continental Europe (CET/CEST) both observe DST, switching on the
+// same date (last Sunday of October) but sitting at different UTC
+// offsets — continental Europe is always 1 hour ahead of the UK/Ireland,
+// both in summer and winter. Hardcoded to 2026's transition date (25
+// Oct) since that's the only year this dataset covers; would need
+// generalizing (last-Sunday-of-October calculation) if the app tracks
+// events beyond 2026.
+const DST_END_2026 = '2026-10-25';
+function getTzLabel(cityId, isoDate){
+  const country = CITIES[cityId] ? CITIES[cityId].country : 'UK';
+  const isSummer = isoDate < DST_END_2026;
+  if (country === 'Ireland') return isSummer ? 'IST' : 'GMT';
+  if (country === 'UK') return isSummer ? 'BST' : 'GMT';
+  return isSummer ? 'CEST' : 'CET';
+}
+
+function formatIsoDateShort(iso){
+  const d = new Date(iso + 'T00:00:00');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function clearSportFilter(){
+  state.sports = new Set(Object.keys(SPORTS));
+  renderAll();
+}
+function clearCountryFilter(){
+  state.countries = new Set(Object.values(CITIES).map(c => c.country));
+  renderAll();
+}
+function clearLocationFilter(){
+  userLocation = null;
+  if (userMarker && leafletMap) { leafletMap.removeLayer(userMarker); userMarker = null; }
+  const btn = document.getElementById('locateBtn');
+  if (btn) btn.classList.remove('active');
+  renderAll();
+}
+async function clearAllFilters(){
+  clearSportFilter_silent();
+  clearCountryFilter_silent();
+  if (userMarker && leafletMap) { leafletMap.removeLayer(userMarker); userMarker = null; }
+  userLocation = null;
+  const btn = document.getElementById('locateBtn');
+  if (btn) btn.classList.remove('active');
+  await setSearchAndDate('', '');
+}
+function clearSportFilter_silent(){ state.sports = new Set(Object.keys(SPORTS)); }
+function clearCountryFilter_silent(){ state.countries = new Set(Object.values(CITIES).map(c => c.country)); }
+
+function renderActiveFilters(){
+  const el = document.getElementById('activeFilters');
+  const pills = [];
+  const totalSports = Object.keys(SPORTS).length;
+  const totalCountries = new Set(Object.values(CITIES).map(c => c.country)).size;
+
+  if (state.sports.size < totalSports){
+    const label = state.sports.size === 1
+      ? `${SPORTS[[...state.sports][0]].name} only`
+      : `${state.sports.size} sports`;
+    pills.push(`<div class="filter-pill f-sport">${esc(label)}<button class="pill-x" data-clear="sport">✕</button></div>`);
+  }
+  if (state.countries.size < totalCountries){
+    const label = state.countries.size === 1
+      ? `${[...state.countries][0]} only`
+      : `${state.countries.size} countries`;
+    pills.push(`<div class="filter-pill f-sport">🌍 ${esc(label)}<button class="pill-x" data-clear="country">✕</button></div>`);
+  }
+  if (state.date){
+    pills.push(`<div class="filter-pill f-date">📅 ${esc(formatIsoDateShort(state.date))}<button class="pill-x" data-clear="date">✕</button></div>`);
+  }
+  if (state.search.trim()){
+    const shown = state.search.length > 16 ? state.search.slice(0, 16) + '…' : state.search;
+    pills.push(`<div class="filter-pill f-search">🔍 "${esc(shown)}"<button class="pill-x" data-clear="search">✕</button></div>`);
+  }
+  if (userLocation){
+    pills.push(`<div class="filter-pill f-near">📍 Near me<button class="pill-x" data-clear="near">✕</button></div>`);
+  }
+
+  if (pills.length === 0){ el.innerHTML = ''; return; }
+  el.innerHTML = pills.join('') + `<button class="clear-all-btn" id="clearAllFiltersBtn">Clear all</button>`;
+
+  el.querySelectorAll('[data-clear]').forEach(btn => {
+    btn.onclick = () => {
+      const kind = btn.dataset.clear;
+      if (kind === 'sport') clearSportFilter();
+      else if (kind === 'country') clearCountryFilter();
+      else if (kind === 'date') setSearchAndDate(state.search, '');
+      else if (kind === 'search') setSearchAndDate('', state.date);
+      else if (kind === 'near') clearLocationFilter();
+    };
+  });
+  const clearAllBtn = document.getElementById('clearAllFiltersBtn');
+  if (clearAllBtn) clearAllBtn.onclick = clearAllFilters;
+}
+
+function renderAll(){
+  renderSportsButton();
+  renderCountryButton();
+  renderMap();
+  renderList();
+  renderActiveFilters();
+  document.getElementById('eventCount').textContent = `${filteredEvents().length} EVENTS`;
+  const avatarBtn = document.getElementById('avatarBtn');
+  avatarBtn.classList.toggle('logged-in', !!currentUser);
+  avatarBtn.textContent = currentUser ? currentUser.name.charAt(0).toUpperCase() : '☺';
+}
+
+// ---- Live fetch attempt (see chat explanation: usually blocked by CORS on
+// the API's side; falls back cleanly to the REAL static snapshot above) ----
+let loadingEvents = false;
+// With no city selector, the app always fetches the full all-cities dataset
+// once at startup — everything after that (sport/date/search/saved) filters
+// client-side against it.
+async function loadAllEvents(){
+  loadingEvents = true;
+  renderAll();
+  try{
+    const res = await fetch(`${API_BASE}/api/events`);
+    if (res.ok) EVENTS = await res.json();
+  }catch(err){ console.error(err); }
+  loadingEvents = false;
+  renderAll();
+}
+
+async function initBackendConnection(){
+  if (!API_BASE) return; // standalone mode — no backend configured, nothing to report
+  const statusEl = document.getElementById('liveStatus');
+  const statusText = document.getElementById('liveStatusText');
+  statusEl.style.display = 'flex';
+  try{
+    const res = await fetch(`${API_BASE}/api/health`);
+    if (!res.ok) throw new Error('unhealthy');
+    usingBackend = true;
+    statusEl.classList.add('ok');
+    statusText.textContent = `✓ Connected to live backend at ${API_BASE}`;
+    await loadAllEvents();
+  }catch(err){
+    usingBackend = false;
+    statusEl.classList.add('fail');
+    statusText.textContent = `Could not reach backend at ${API_BASE} — showing local demo data`;
+    renderAll();
+  }
+}
+
+// The date picker can't be used to select a day that's already past —
+// its minimum bound is today, not a fixed date, so this also stays
+// correct automatically as real time moves forward.
+(function(){
+  const dateEl = document.getElementById('dateInput');
+  const fixedMax = dateEl.getAttribute('max'); // 2026-12-31
+  dateEl.min = TODAY_ISO > fixedMax ? fixedMax : TODAY_ISO;
+})();
+
+applyTheme();
+renderAll();
+setView('map');
+if (API_BASE){
+  initBackendConnection();
+}
+</script>
+</body>
+</html>

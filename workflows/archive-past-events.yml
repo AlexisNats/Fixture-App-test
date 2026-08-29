@@ -1,0 +1,57 @@
+name: Archive past events
+
+# Runs the archive script automatically on a schedule, instead of relying
+# on someone remembering to run it by hand. This ONLY handles removing
+# stale events — see the README section "Keeping the dataset fresh" for
+# why adding NEW events can't be automated the same way.
+
+on:
+  schedule:
+    # Every Monday at 04:00 UTC — early enough not to clash with anyone
+    # working on the repo, frequent enough that stale events don't pile up
+    # for more than a week.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+    # Lets you trigger this manually from the GitHub Actions tab too,
+    # without waiting for Monday — useful right after a big data push.
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run the archive script
+        run: node scripts/archive-past-events.js
+
+      - name: Regenerate frontend EVENTS array from seed-data.js
+        run: |
+          node -e "
+            const { EVENTS } = require('./backend/seed-data.js');
+            const fs = require('fs');
+            const lines = EVENTS.map(e => {
+              const parts = [];
+              for (const [k, v] of Object.entries(e)) {
+                if (typeof v === 'string') parts.push(k + ':' + JSON.stringify(v));
+                else if (v === null) parts.push(k + ':null');
+                else parts.push(k + ':' + v);
+              }
+              return '  { ' + parts.join(', ') + ' },';
+            });
+            const newBlock = 'let EVENTS = [\n' + lines.join('\n') + '\n];';
+            let content = fs.readFileSync('frontend/index.html', 'utf8');
+            content = content.replace(/let EVENTS = \[\n[\s\S]*?\n\];/, newBlock);
+            fs.writeFileSync('frontend/index.html', content);
+          "
+
+      - name: Commit changes, if any
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/seed-data.js frontend/index.html archive/events-archive.json
+          git diff --staged --quiet || git commit -m "Automated: archive past events"
+          git diff --staged --quiet || git push
