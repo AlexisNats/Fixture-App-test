@@ -1,20 +1,20 @@
-name: Research new fixtures (proposal only — requires human review)
+name: Research new fixtures (auto-merge verified, PR for the rest)
 
 # Runs monthly, uses Claude (with web search) to look for real new
-# fixtures that fill gaps in the existing dataset, and opens a Pull
-# Request with what it finds — it does NOT commit directly to seed-data.js
-# and does NOT auto-merge. A human (or a future Claude chat session)
-# still needs to check the proposal, verify anything that looks
-# uncertain, and manually fold good entries into seed-data.js in the
-# correct format. This is deliberately a proposal step, not a publish
-# step — see scripts/research-new-fixtures.js for why.
+# fixtures, then runs a SECOND independent Claude pass whose only job is
+# to try to disprove each one. Fixtures that pass verification are
+# committed directly — no human step. Fixtures that don't pass (or that
+# the verifier is genuinely unsure about) open a Pull Request instead,
+# same as before this workflow had a verification step at all.
+#
+# This is a deliberate middle ground, not "fully automatic with no
+# safety net" — see scripts/verify-and-merge-fixtures.js for the honest
+# reasoning on what a second AI pass can and can't catch.
 
 on:
   schedule:
-    # Monthly, not weekly — this is meant to supplement periodic manual/
-    # Claude-assisted deep-dive sessions, not replace them. Running it too
-    # often would produce more unreviewed PRs than anyone can realistically
-    # check carefully.
+    # Monthly, not weekly — see README "Keeping the dataset fresh" for
+    # why more frequent runs wouldn't actually find proportionally more.
     - cron: '0 6 1 * *'
   workflow_dispatch:
     # Manual trigger from the Actions tab, for whenever you want to run
@@ -30,51 +30,56 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Research new fixtures
+      - name: Research new fixtures (proposal pass)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/research-new-fixtures.js
 
-      - name: Open a PR with the proposal (only if something was found)
+      - name: Verify each proposal and auto-merge what passes
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/verify-and-merge-fixtures.js
+
+      - name: Commit and push anything auto-merged
+        id: automerge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/seed-data.js frontend/index.html
+          if git diff --staged --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Auto-merged fixture(s) that passed independent verification"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a PR for anything uncertain (only if something needs review)
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "Proposed new fixtures — needs human review before merging"
-          title: "🔍 Proposed new fixtures (automated research — review required)"
+          commit-message: "Uncertain fixtures — needs your review before merging"
+          title: "🔍 Fixtures needing review (failed or unclear on independent verification)"
           body: |
-            This PR was opened automatically by the monthly fixture-research job.
+            This PR was opened automatically. Everything in this PR is here
+            SPECIFICALLY because the independent verification pass could not
+            confirm it — anything that passed was already auto-merged
+            directly to main without a PR, so you won't see that here.
 
-            This run does two things: (1) fills gaps in cities/sports already
-            tracked, and (2) checks a rotating set of 5 "known-good discovery
-            sources" (see `DISCOVERY_SOURCES` in the script — 34 total,
-            organized by sport, cycling through roughly every 7 months) for
-            brand new cities — the same competitions/leagues that have
-            reliably worked in interactive research sessions (Top 14, EIHL,
-            Champions Cup, etc.), plus systematic coverage of every sport
-            already tracked (remaining Bundesliga/La Liga/Serie A cities,
-            Pro D2, Rugby Europe, RFL Championship, EuroCup, and more),
-            including Romania/Poland rugby.
+            **How to review this:**
+            1. Open `uncertain-fixtures.json` in this PR
+            2. Each entry has a `"verificationNote"` field explaining exactly
+               why it didn't pass — a specific problem found, or that no
+               independent confirmation could be located
+            3. If you want to accept one anyway (e.g. you know the source is
+               right despite the flag), you'll need to manually format it
+               into `backend/seed-data.js` yourself, or ask Claude to do it
+               interactively — this PR's file is a proposal list, not
+               something that gets merged as-is
+            4. If you don't want any of them, just close this PR — nothing
+               changes
 
-            **Nothing in this PR is live yet.** `proposed-fixtures.json` contains
-            fixtures Claude found via web search that MIGHT be worth adding —
-            it has NOT been checked with the same scrutiny as the rest of this
-            dataset (cross-referencing conflicting sources, verifying day-of-week
-            math, confirming a source isn't describing a past season, etc.).
-            New-city proposals (`isNewCity: true`) deserve extra scrutiny —
-            discovery is higher-risk than gap-filling.
-
-            Before merging anything from this into `backend/seed-data.js`:
-            1. Check each entry's source is real and current
-            2. Watch for anything marked with a "note" field — that means the
-               research step itself flagged uncertainty
-            3. For new cities, check whether a second sport is easy to find
-               too, the same way interactive sessions have done
-            4. Format entries to match the existing style in seed-data.js
-               (see CONTRIBUTING or ask Claude to do this step interactively)
-            5. Regenerate `frontend/index.html`'s EVENTS array (and CITIES,
-               if new cities were added) to match
-            6. Test before merging — don't just copy-paste and ship
-
-            If `proposed-fixtures.json` is empty, this run found nothing
-            worth proposing this month.
-          branch: automated-fixture-proposals
-          add-paths: proposed-fixtures.json
+            You'll get GitHub's normal notification for this PR (check
+            Settings → Notifications if you're not seeing them) — no
+            separate notification system needed beyond that.
+          branch: fixtures-needing-review
+          add-paths: uncertain-fixtures.json
