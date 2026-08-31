@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // Calls Claude (with web search) to research fixtures — both filling gaps
-// in existing cities/sports (mode: "gaps") and discovering brand new
-// cities/sports via known-good sources (mode: "discovery"). Writes
+// in existing cities/sports (mode: "gaps") and genuinely open-ended
+// discovery of new cities/sports ANYWHERE in Europe, in ANY sport
+// (mode: "discovery"). DISCOVERY_SOURCES below is a rotating set of
+// starting points/inspiration for each run, not a boundary — earlier
+// versions of this script limited discovery to only that fixed list,
+// which meant it could never find a sport or country not already
+// enumerated there; that restriction was removed on purpose. Writes
 // proposed additions to a separate file for the GitHub Actions workflow
 // to open as a Pull Request — this script never touches seed-data.js
 // directly, in either mode.
@@ -130,13 +135,43 @@ ${existingSummary}
 
 Look for real, upcoming fixtures that fill an obvious gap (a sport with nothing beyond a certain date, during its active season).
 
-## Job 2: discover new cities/sports via this run's assigned sources
+## Job 2: discover new cities/sports — genuinely open-ended, not limited to any fixed list
+This run's rotated starting points (use these as inspiration, NOT as a
+boundary — this is the important part):
 ${sourcesBlock}
 
-For each source above, check whether it surfaces a genuine new city not in this list: ${existingCitiesList}
-If you find a real new city, ALSO do a quick follow-up check for a SECOND sport in that same city before moving on — this project's own history shows checking for a second sport immediately, once a city is found, reliably pays off (e.g. finding Dundee via ice hockey, then checking Dundee FC's football fixtures in the same pass).
+Check those, but don't stop there. The actual goal is: find real upcoming
+fixtures for ANY sport, in ANY city, ANYWHERE in Europe, that isn't in our
+dataset yet — including sports and competitions not listed anywhere in
+this prompt. Use your own judgment about where to look beyond the
+starting points above. A rough guide from this project's own history,
+not a restriction:
+- Sports with weekly domestic club calendars (football, rugby, rugby
+  league, basketball, ice hockey) tend to have the best official-site
+  data and are usually worth checking in a new country/city if you
+  haven't already.
+- Sports organised mainly around occasional national-team tournaments
+  rather than club calendars (this project has specifically struggled
+  with volleyball, badminton, and table tennis in general searches) are
+  harder — a named individual club's own site tends to work better than
+  searching the sport/league generally.
+- New sports entirely are fair game (boxing, darts, and athletics were
+  each added this way when a source clearly warranted it) — don't force
+  one, but don't rule one out either.
 
-Full sport list already in use: ${SPORTS.map(s => s.id).join(', ')}. You may propose a genuinely new sport if a source clearly warrants it (as boxing, darts, and athletics were each added this way), but don't force one.
+Existing cities already tracked (don't re-propose these unless adding a
+genuinely new sport for one of them): ${existingCitiesList}
+Full sport list already in use: ${SPORTS.map(s => s.id).join(', ')}.
+
+If you find a real new city, ALSO do a quick follow-up check for a SECOND
+sport in that same city before moving on — this project's own history
+shows checking for a second sport immediately, once a city is found,
+reliably pays off (e.g. finding Dundee via ice hockey, then checking
+Dundee FC's football fixtures in the same pass).
+
+Budget for this run: roughly 15-25 searches total across both jobs — wide
+enough to genuinely explore beyond the starting points, not so wide that
+a single run runs unbounded.
 
 Rules, non-negotiable:
 - Every fixture must come from a real source you actually searched for. Never invent a date, time, opponent, or city.
@@ -159,7 +194,7 @@ Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxi
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192, // raised from 4096 — a genuinely open-ended search across all of Europe can reasonably surface more findings in one run than the old fixed-list version did
       messages: [{ role: 'user', content: prompt }],
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
     }),
@@ -201,4 +236,3 @@ main().catch(err => {
   console.error(err);
   process.exit(1);
 });
-
