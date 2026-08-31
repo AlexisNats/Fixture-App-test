@@ -74,6 +74,13 @@ const CITIES = [
   { id: "lyon", name: "Lyon", country: "France" },
   { id: "larochelle", name: "La Rochelle", country: "France" },
   { id: "gloucester", name: "Gloucester", country: "UK" },
+  { id: "naples", name: "naples", country: "Italy" },
+  { id: "alkmaar", name: "alkmaar", country: "Netherlands" },
+  { id: "limerick", name: "limerick", country: "Ireland" },
+  { id: "galway", name: "galway", country: "Ireland" },
+  { id: "llanelli", name: "llanelli", country: "UK" },
+  { id: "treviso", name: "treviso", country: "Italy" },
+  { id: "parma", name: "parma", country: "Italy" },
 ];
 
 const EVENTS = [
@@ -188,17 +195,6 @@ const EVENTS = [
   { id:"e137", sport:"tennis", city:"paris", tier:"ATP Masters 1000", eventName:"Paris Masters", venue:"La Défense Arena", area:"Nanterre", date:"Mon 02 Nov", isoDate:"2026-11-02", time:"11:00", status:"official", source:"Club box office", tag:"real", blurb:"The final Masters 1000 event of the ATP season.", lat:48.8965, lng:2.2286 },
   { id:"e138", sport:"golf", city:"paris", tier:"DP World Tour", eventName:"FedEx Open de France — Round 1", venue:"Le Golf National", area:"Saint-Quentin-en-Yvelines", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"08:00", status:"official", source:"Club box office", tag:"real", lat:48.7486, lng:2.0672 },
   { id:"e139", sport:"snooker", city:"york", tier:"World Snooker Tour — Triple Crown", eventName:"UK Championship", venue:"York Barbican", area:"York", date:"Fri 27 Nov", isoDate:"2026-11-27", time:"10:00", status:"official", source:"Club box office", tag:"real", blurb:"Part of snooker's Triple Crown, alongside the Masters and World Championship.", lat:53.9576, lng:-1.0827 },
-  // ---------------------------------------------------------------------
-  // London density push (Sep 2026 research round) — specifically aimed at
-  // giving the multi-event trip planner real material to work with:
-  // staggered kickoff times across different sports, not just more
-  // football at the same fixed slots. Two new sports added: Darts (PDC
-  // World Darts Championship) and American Football (NFL London). Also
-  // genuinely extends the dataset into January 2027 via the Masters
-  // snooker tournament — not an arbitrary extension, both Alexandra
-  // Palace events (darts, snooker) are confirmed via the venue's own
-  // official site and/or the tournament organiser's own site.
-  // ---------------------------------------------------------------------
   { id:"e140", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Saracens", venue:"Twickenham Stoop", area:"Twickenham", date:"Sun 25 Oct", isoDate:"2026-10-25", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:51.4556, lng:-0.3401 },
   { id:"e141", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Leicester Tigers", venue:"Twickenham Stoop", area:"Twickenham", date:"Sat 05 Dec", isoDate:"2026-12-05", time:"15:05", status:"official", source:"Club box office", tag:"real", lat:51.4556, lng:-0.3401 },
   { id:"e142", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby", home:"Harlequins", away:"Northampton Saints", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Mon 28 Dec", isoDate:"2026-12-28", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"\"The Big Game\" — Harlequins' marquee fixture, moved from their own Stoop ground to the much larger national stadium.", lat:51.4548, lng:-0.3417 },
@@ -208,98 +204,33 @@ const EVENTS = [
   { id:"e146", sport:"snooker", city:"london", tier:"World Snooker Tour — Triple Crown", eventName:"The Masters — Day 1", venue:"Alexandra Palace", area:"Alexandra Park", date:"Sun 10 Jan", isoDate:"2027-01-10", time:"13:00", status:"official", source:"Club box office", tag:"real", blurb:"The second Triple Crown event of the season, following the UK Championship.", lat:51.5941, lng:-0.1279 },
   { id:"e147", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Indianapolis Colts", away:"Washington Commanders", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sun 04 Oct", isoDate:"2026-10-04", time:"14:30", status:"official", source:"Club box office", tag:"real", lat:51.6043, lng:-0.0664 },
   { id:"e148", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Philadelphia Eagles", away:"Jacksonville Jaguars", venue:"Tottenham Hotspur Stadium", area:"Tottenham", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"14:30", status:"official", source:"Club box office", tag:"real", lat:51.6043, lng:-0.0664 },
-  { id:"e149", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Jacksonville Jaguars", away:"Houston Texans", venue:"Wembley Stadium", area:"Wembley", date:"Sun 18 Oct", isoDate:"2026-10-18", time:"14:30", status:"official", source:"Club box office", tag:"real", blurb:"The Jaguars' 12th game at Wembley — back-to-back London home games across consecutive weekends.", lat:51.5560, lng:-0.2795 },
-  // Bug-audit + continued London depth push (Sep 2026). Full data-integrity
-  // sweep run across all 121 events beforehand — no duplicate IDs, no
-  // impossible same-team/same-day venue conflicts, no accidental
-  // duplicate fixtures found. One venue-coordinate false positive
-  // investigated and confirmed correct (Leicester's two real, genuinely
-  // separate venues just happen to round to the same 2-decimal-place
-  // coordinate bucket).
-  { id:"e150", sport:"tennis", city:"london", tier:"Laver Cup", eventName:"Laver Cup — Day 1 (Team Europe v Team World)", venue:"The O2 Arena", area:"Greenwich Peninsula", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"12:30", status:"official", source:"Club box office", tag:"real", blurb:"9th edition — the O2 hosted this in 2022 for Roger Federer's retirement. Confirmed players include Carlos Alcaraz and Alexander Zverev (Team Europe) and Taylor Fritz and Alex de Minaur (Team World).", lat:51.5030, lng:0.0032 },
-  // ---------------------------------------------------------------------
-  // Six Nations Rugby 2027 (Sep 2026 research round) — all 15 fixtures,
-  // cross-confirmed by Six Nations' own official site plus 5+ independent
-  // sources all agreeing on dates and kickoff times. This is the single
-  // highest-value addition of this round: real home fixtures across SIX
-  // cities already in the dataset (London, Cardiff, Edinburgh, Dublin,
-  // Rome, Paris), genuinely extending the season into March 2027 rather
-  // than an arbitrary date-range extension.
-  // ---------------------------------------------------------------------
+  { id:"e149", sport:"americanfootball", city:"london", tier:"NFL London Games", home:"Jacksonville Jaguars", away:"Houston Texans", venue:"Wembley Stadium", area:"Wembley", date:"Sun 18 Oct", isoDate:"2026-10-18", time:"14:30", status:"official", source:"Club box office", tag:"real", blurb:"The Jaguars' 12th game at Wembley — back-to-back London home games across consecutive weekends.", lat:51.556, lng:-0.2795 },
+  { id:"e150", sport:"tennis", city:"london", tier:"Laver Cup", eventName:"Laver Cup — Day 1 (Team Europe v Team World)", venue:"The O2 Arena", area:"Greenwich Peninsula", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"12:30", status:"official", source:"Club box office", tag:"real", blurb:"9th edition — the O2 hosted this in 2022 for Roger Federer's retirement. Confirmed players include Carlos Alcaraz and Alexander Zverev (Team Europe) and Taylor Fritz and Alex de Minaur (Team World).", lat:51.503, lng:0.0032 },
   { id:"e151", sport:"rugby", city:"dublin", tier:"Six Nations", home:"Ireland", away:"England", venue:"Aviva Stadium", area:"Ballsbridge", date:"Fri 05 Feb", isoDate:"2027-02-05", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Six Nations Round 1 opener.", lat:53.3352, lng:-6.2286 },
-  { id:"e152", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Italy", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 06 Feb", isoDate:"2027-02-06", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.2350 },
+  { id:"e152", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Italy", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 06 Feb", isoDate:"2027-02-06", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.235 },
   { id:"e153", sport:"rugby", city:"paris", tier:"Six Nations", home:"France", away:"Wales", venue:"Stade de France", area:"Saint-Denis", date:"Sat 06 Feb", isoDate:"2027-02-06", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:48.9244, lng:2.3601 },
   { id:"e154", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"Ireland", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 13 Feb", isoDate:"2027-02-13", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:41.9339, lng:12.4547 },
-  { id:"e155", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Wales", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 13 Feb", isoDate:"2027-02-13", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.2350 },
+  { id:"e155", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Wales", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Sat 13 Feb", isoDate:"2027-02-13", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:55.9411, lng:-3.235 },
   { id:"e156", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"France", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sun 14 Feb", isoDate:"2027-02-14", time:"15:10", status:"official", source:"Club box office", tag:"real", blurb:"\"Le Crunch\" — England v France, on Valentine's Day.", lat:51.4548, lng:-0.3417 },
   { id:"e157", sport:"rugby", city:"cardiff", tier:"Six Nations", home:"Wales", away:"Ireland", venue:"Principality Stadium", area:"Cardiff City Centre", date:"Sat 20 Feb", isoDate:"2027-02-20", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:51.4782, lng:-3.1826 },
   { id:"e158", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"Italy", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 20 Feb", isoDate:"2027-02-20", time:"16:40", status:"official", source:"Club box office", tag:"real", lat:51.4548, lng:-0.3417 },
   { id:"e159", sport:"rugby", city:"paris", tier:"Six Nations", home:"France", away:"Scotland", venue:"Stade de France", area:"Saint-Denis", date:"Sun 21 Feb", isoDate:"2027-02-21", time:"15:10", status:"official", source:"Club box office", tag:"real", lat:48.9244, lng:2.3601 },
-  { id:"e160", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Ireland", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Fri 05 Mar", isoDate:"2027-03-05", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Six Nations' first-ever Friday night fixture at Murrayfield.", lat:55.9411, lng:-3.2350 },
+  { id:"e160", sport:"rugby", city:"edinburgh", tier:"Six Nations", home:"Scotland", away:"Ireland", venue:"Murrayfield Stadium", area:"Murrayfield", date:"Fri 05 Mar", isoDate:"2027-03-05", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Six Nations' first-ever Friday night fixture at Murrayfield.", lat:55.9411, lng:-3.235 },
   { id:"e161", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"France", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 06 Mar", isoDate:"2027-03-06", time:"14:10", status:"official", source:"Club box office", tag:"real", lat:41.9339, lng:12.4547 },
   { id:"e162", sport:"rugby", city:"cardiff", tier:"Six Nations", home:"Wales", away:"England", venue:"Principality Stadium", area:"Cardiff City Centre", date:"Sat 06 Mar", isoDate:"2027-03-06", time:"16:40", status:"official", source:"Club box office", tag:"real", blurb:"The Anglo-Welsh rivalry.", lat:51.4782, lng:-3.1826 },
   { id:"e163", sport:"rugby", city:"rome", tier:"Six Nations", home:"Italy", away:"Wales", venue:"Stadio Olimpico", area:"Foro Italico", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"14:10", status:"official", source:"Club box office", tag:"real", blurb:"Super Saturday — the tournament's final round, three matches back to back.", lat:41.9339, lng:12.4547 },
   { id:"e164", sport:"rugby", city:"london", tier:"Six Nations", home:"England", away:"Scotland", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"16:40", status:"official", source:"Club box office", tag:"real", blurb:"The Calcutta Cup, on Super Saturday.", lat:51.4548, lng:-0.3417 },
   { id:"e165", sport:"rugby", city:"dublin", tier:"Six Nations", home:"Ireland", away:"France", venue:"Aviva Stadium", area:"Ballsbridge", date:"Sat 13 Mar", isoDate:"2027-03-13", time:"20:10", status:"official", source:"Club box office", tag:"real", blurb:"Super Saturday's finale — potentially title-deciding.", lat:53.3352, lng:-6.2286 },
-  // ---------------------------------------------------------------------
-  // Season-finals + new-sport push (Sep 2026 research round). Pushed the
-  // date range to July 2027 — beyond the "May/June 27" ask, but the
-  // London Diamond League data was too clean (2 independent sources) to
-  // leave out over a 6-week technicality. All 3 "final" entries below
-  // (FA Cup, Premiership Rugby, Champions League) have opponents marked
-  // TBC honestly — the finalists genuinely aren't determined yet, not a
-  // data gap. A real source conflict was caught and resolved for the FA
-  // Cup Final specifically: Sky Sports' dedicated season-dates feature
-  // said 22 May, a smaller ticketing site said 15 May — trusted Sky
-  // Sports as the more authoritative, dedicated source.
-  // ---------------------------------------------------------------------
   { id:"e166", sport:"snooker", city:"sheffield", tier:"World Snooker Tour — Triple Crown", eventName:"World Snooker Championship — Day 1", venue:"Crucible Theatre", area:"Sheffield City Centre", date:"Sat 17 Apr", isoDate:"2027-04-17", time:"10:00", status:"official", source:"Club box office", tag:"real", blurb:"The centenary edition — 51st consecutive year at the Crucible. The season's final and biggest Triple Crown event.", lat:53.3797, lng:-1.4659 },
-  { id:"e167", sport:"football", city:"london", tier:"FA Cup Final", eventName:"FA Cup Final 2027 (finalists TBC)", venue:"Wembley Stadium", area:"Wembley", date:"Sat 22 May", isoDate:"2027-05-22", time:"16:30", status:"official", source:"Club box office", tag:"real", blurb:"Finalists not yet determined — the competition is still ongoing. Date confirmed via Sky Sports' dedicated season-dates announcement, which took priority over a conflicting date (15 May) from a smaller ticketing site.", lat:51.5560, lng:-0.2795 },
+  { id:"e167", sport:"football", city:"london", tier:"FA Cup Final", eventName:"FA Cup Final 2027 (finalists TBC)", venue:"Wembley Stadium", area:"Wembley", date:"Sat 22 May", isoDate:"2027-05-22", time:"16:30", status:"official", source:"Club box office", tag:"real", blurb:"Finalists not yet determined — the competition is still ongoing. Date confirmed via Sky Sports' dedicated season-dates announcement, which took priority over a conflicting date (15 May) from a smaller ticketing site.", lat:51.556, lng:-0.2795 },
   { id:"e168", sport:"football", city:"madrid", tier:"UEFA Champions League Final", eventName:"UEFA Champions League Final 2027 (finalists TBC)", venue:"Riyadh Air Metropolitano", area:"San Blas-Canillejas", date:"Sat 05 Jun", isoDate:"2027-06-05", time:"21:00", status:"official", source:"Club box office", tag:"real", blurb:"European club football's biggest match — finalists not yet determined.", lat:40.4362, lng:-3.5995 },
   { id:"e169", sport:"rugby", city:"london", tier:"Gallagher Premiership Rugby Final", eventName:"Gallagher Premiership Rugby Final 2027 (finalists TBC)", venue:"Allianz Stadium (Twickenham)", area:"Twickenham", date:"Sat 19 Jun", isoDate:"2027-06-19", time:"15:00", status:"official", source:"Club box office", tag:"real", blurb:"Confirmed directly via Premiership Rugby's own official site.", lat:51.4548, lng:-0.3417 },
   { id:"e170", sport:"athletics", city:"london", tier:"Diamond League", eventName:"Novuna London Athletics Meet 2027", venue:"London Stadium", area:"Stratford", date:"Sat 17 Jul", isoDate:"2027-07-17", time:"11:00", status:"official", source:"Ticketmaster", tag:"real", blurb:"2026 saw Josh Kerr break the men's mile world record here (3:42.66). New sport category — Athletics/Track & Field.", lat:51.5386, lng:-0.0165 },
-  // ---------------------------------------------------------------------
-  // Rugby/basketball push + volleyball/badminton/table tennis exploration
-  // (Sep 2026 research round). Cardiff Rugby confirmed directly via their
-  // own official site. Munich/Berlin basketball and Paris rugby did NOT
-  // yield confirmable fixtures this round. Volleyball/badminton/table
-  // tennis were searched specifically but NOT added at all — these sports
-  // are organised around occasional national-team tournaments far more
-  // than weekly domestic club fixtures, a structurally different shape of
-  // data than everything else in this dataset. See README changelog for
-  // the full honest breakdown of what was tried and why it didn't land.
-  // ---------------------------------------------------------------------
   { id:"e171", sport:"rugby", city:"cardiff", tier:"United Rugby Championship", home:"Cardiff Rugby", away:"Zebre Parma", venue:"Cardiff Arms Park", area:"Cardiff City Centre", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"Cardiff Rugby's first home fixture of their 150th-anniversary season.", lat:51.4816, lng:-3.1791 },
-  // ---------------------------------------------------------------------
-  // 3 new cities added via ice hockey (Sep 2026 research round) — used
-  // EIHL's own official "Opening Weekend" announcement as the discovery
-  // vector, since ice hockey has consistently had the best official-site
-  // data of any sport tried this session. Dundee got a bonus second sport
-  // (football) once found, confirmed directly via the SPFL's own site.
-  // Volleyball, Badminton, and Table Tennis were tried again this round —
-  // Table Tennis Bundesliga is confirmed as a genuine real domestic
-  // league, but no specific 2026/27 fixture could be pinned down via
-  // search; left unadded rather than guessed, a candidate for a more
-  // targeted per-club search in a future round.
-  // ---------------------------------------------------------------------
-  { id:"e172", sport:"icehockey", city:"dundee", tier:"Elite Ice Hockey League", home:"Dundee Stars", away:"Fife Flyers", venue:"Dundee Ice Arena", area:"Dundee", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"EIHL opening weekend.", lat:56.4620, lng:-2.9707 },
+  { id:"e172", sport:"icehockey", city:"dundee", tier:"Elite Ice Hockey League", home:"Dundee Stars", away:"Fife Flyers", venue:"Dundee Ice Arena", area:"Dundee", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"EIHL opening weekend.", lat:56.462, lng:-2.9707 },
   { id:"e173", sport:"football", city:"dundee", tier:"Scottish Premiership", home:"Dundee", away:"Hibernian", venue:"Dens Park", area:"Dundee", date:"Sun 30 Aug", isoDate:"2026-08-30", time:"15:00", status:"official", source:"Club box office", tag:"real", lat:56.4775, lng:-2.9713 },
   { id:"e174", sport:"icehockey", city:"guildford", tier:"Elite Ice Hockey League", home:"Guildford Flames", away:"Sheffield Steelers", venue:"Guildford Spectrum", area:"Guildford", date:"Sun 13 Sep", isoDate:"2026-09-13", time:"18:00", status:"official", source:"Club box office", tag:"real", blurb:"EIHL opening weekend.", lat:51.2461, lng:-0.5786 },
   { id:"e175", sport:"icehockey", city:"kirkcaldy", tier:"Elite Ice Hockey League", home:"Fife Flyers", away:"Sheffield Steelers", venue:"Fife Ice Arena", area:"Kirkcaldy", date:"Sun 04 Oct", isoDate:"2026-10-04", time:"17:00", status:"official", source:"Club box office", tag:"real", blurb:"Fife Flyers' first home Elite League fixture of the season.", lat:56.1165, lng:-3.1596 },
-  // ---------------------------------------------------------------------
-  // Major rugby push (Sep 2026 research round) — Top 14, Investec
-  // Champions Cup. All 7 Top 14 Round 1 fixtures confirmed directly via
-  // the competition's own official site (top14.lnr.fr), cross-checked
-  // against 3 independent French sports outlets all agreeing. This one
-  // round of research alone added 6 new French cities, gave Paris a 3rd
-  // sport, and gave Lyon a 2nd sport (basketball) via a quick follow-up
-  // search once the city was found — the "use an easy sport, then check
-  // for others" strategy working exactly as intended. Gloucester added
-  // via a confirmed Champions Cup Round 1 fixture. Romania and Poland's
-  // domestic rugby championships (explicitly requested) were NOT reached
-  // this round — ran out of research budget after the Top 14/Champions
-  // Cup work; still open for a future round.
-  // ---------------------------------------------------------------------
   { id:"e176", sport:"rugby", city:"bayonne", tier:"Top 14", home:"Aviron Bayonnais", away:"RC Toulon", venue:"Stade Jean-Dauger", area:"Bayonne", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:43.4929, lng:-1.4749 },
   { id:"e177", sport:"rugby", city:"bordeaux", tier:"Top 14", home:"Union Bordeaux-Bègles", away:"Racing 92", venue:"Stade Chaban-Delmas", area:"Bordeaux", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"21:15", status:"official", source:"Club box office", tag:"real", blurb:"Bordeaux-Bègles are the reigning back-to-back European (Champions Cup) champions.", lat:44.8386, lng:-0.6119 },
   { id:"e178", sport:"rugby", city:"montpellier", tier:"Top 14", home:"Montpellier Hérault Rugby", away:"Section Paloise", venue:"GGL Stadium", area:"Montpellier", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", lat:43.6229, lng:3.8122 },
@@ -309,6 +240,32 @@ const EVENTS = [
   { id:"e182", sport:"rugby", city:"paris", tier:"Top 14", home:"Stade Français Paris", away:"USA Perpignan", venue:"Stade Jean-Bouin", area:"Paris", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", blurb:"Paris' 3rd sport in the dataset, alongside tennis (Paris Masters) and golf (FedEx Open de France).", lat:48.8412, lng:2.2531 },
   { id:"e183", sport:"basketball", city:"lyon", tier:"EuroLeague", home:"LDLC ASVEL Villeurbanne", away:"Maccabi Tel Aviv", venue:"Astroballe", area:"Villeurbanne", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"20:45", status:"official", source:"Club box office", tag:"real", lat:45.7728, lng:4.8797 },
   { id:"e184", sport:"rugby", city:"gloucester", tier:"Investec Champions Cup", home:"Gloucester Rugby", away:"Union Bordeaux-Bègles", venue:"Kingsholm Stadium", area:"Gloucester", date:"Fri 16 Oct", isoDate:"2026-10-16", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"Champions Cup Round 1 — the reigning back-to-back champions' title defence opens away at Kingsholm.", lat:51.8683, lng:-2.2493 },
+  { id:"e185", sport:"rugbyleague", city:"perpignan", tier:"Super League Rd 26", home:"Catalans Dragons", away:"York Knights", venue:"Stade Gilbert Brutus", area:"Pyrénées-Orientales", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"17:00", status:"official", source:"https://www.alloutrugbyleague.co.uk/news/super-league-fixtures-live-full-1529082", tag:"real" },
+  { id:"e186", sport:"football", city:"amsterdam", tier:"Eredivisie Md 7", home:"Ajax", away:"Excelsior", venue:"Johan Cruijff ArenA", area:"North Holland", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"20:00", status:"official", source:"https://english.ajax.nl/games", tag:"real" },
+  { id:"e187", sport:"football", city:"naples", tier:"Serie A Md 6", home:"Napoli", away:"Frosinone", venue:"Stadio Diego Armando Maradona", area:"Campania", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"13:30", status:"official", source:"https://www.goal.com/en/team/ssc-napoli/fixtures-results/gi0l1habji5hpgar77dl5jqe", tag:"real" },
+  { id:"e188", sport:"football", city:"alkmaar", tier:"Eredivisie Md 5", home:"AZ Alkmaar", away:"Willem II", venue:"AFAS Stadion", area:"North Holland", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"https://www.goal.com/en/team/az-alkmaar/fixtures-results/3kfktv64h7kg7zryax1wktr5r", tag:"real" },
+  { id:"e189", sport:"rugby", city:"limerick", tier:"URC Rd 1", home:"Munster", away:"Glasgow Warriors", venue:"Thomond Park", area:"Munster", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
+  { id:"e190", sport:"rugby", city:"galway", tier:"URC Rd 1", home:"Connacht", away:"DHL Stormers", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e191", sport:"rugby", city:"galway", tier:"URC Rd 5", home:"Connacht", away:"Leinster", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 30 Oct", isoDate:"2026-10-30", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e192", sport:"rugby", city:"llanelli", tier:"URC Rd 1", home:"Scarlets", away:"Cardiff", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"19:45", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
+  { id:"e193", sport:"rugby", city:"llanelli", tier:"URC Rd 3", home:"Scarlets", away:"Benetton", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"17:30", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
+  { id:"e194", sport:"rugby", city:"treviso", tier:"URC Rd 1", home:"Benetton", away:"Dragons", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
+  { id:"e195", sport:"rugby", city:"treviso", tier:"URC Rd 2", home:"Benetton", away:"Connacht", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e196", sport:"rugby", city:"parma", tier:"URC Rd 1", home:"Zebre Parma", away:"Vodacom Bulls", venue:"Stadio Sergio Lanfranchi", area:"Emilia-Romagna", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
+  { id:"e197", sport:"rugby", city:"galway", tier:"Champions Cup Rd 1", home:"Connacht", away:"Saracens", venue:"Dexcom Stadium", area:"Connacht", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"17:30", status:"official", source:"https://www.connachtrugby.ie/news/champions-cup-fixture-details-confirmed/bp3759/", tag:"real" },
+  { id:"e198", sport:"rugbyleague", city:"perpignan", tier:"Super League Rd 26", home:"Catalans Dragons", away:"York Knights", venue:"Stade Gilbert Brutus", area:"Pyrénées-Orientales", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"17:00", status:"official", source:"https://www.alloutrugbyleague.co.uk/news/super-league-fixtures-live-full-1529082", tag:"real" },
+  { id:"e199", sport:"football", city:"amsterdam", tier:"Eredivisie Md 7", home:"Ajax", away:"Excelsior", venue:"Johan Cruijff ArenA", area:"North Holland", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"20:00", status:"official", source:"https://english.ajax.nl/games", tag:"real" },
+  { id:"e200", sport:"football", city:"naples", tier:"Serie A Md 6", home:"Napoli", away:"Frosinone", venue:"Stadio Diego Armando Maradona", area:"Campania", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"18:30", status:"official", source:"https://www.goal.com/en/team/ssc-napoli/fixtures-results/gi0l1habji5hpgar77dl5jqe", tag:"real" },
+  { id:"e201", sport:"football", city:"alkmaar", tier:"Eredivisie Md 5", home:"AZ Alkmaar", away:"Willem II", venue:"AFAS Stadion", area:"North Holland", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"https://www.goal.com/en/team/az-alkmaar/fixtures-results/3kfktv64h7kg7zryax1wktr5r", tag:"real" },
+  { id:"e202", sport:"rugby", city:"limerick", tier:"URC Rd 1", home:"Munster", away:"Glasgow Warriors", venue:"Thomond Park", area:"Munster", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
+  { id:"e203", sport:"rugby", city:"galway", tier:"URC Rd 1", home:"Connacht", away:"DHL Stormers", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e204", sport:"rugby", city:"galway", tier:"URC Rd 5", home:"Connacht", away:"Leinster", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 30 Oct", isoDate:"2026-10-30", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e205", sport:"rugby", city:"galway", tier:"EPCR Champions Cup Rd 1", home:"Connacht", away:"Saracens", venue:"Dexcom Stadium", area:"Connacht", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"17:30", status:"official", source:"https://www.connachtrugby.ie/news/champions-cup-fixture-details-confirmed/bp3759/", tag:"real" },
+  { id:"e206", sport:"rugby", city:"llanelli", tier:"URC Rd 1", home:"Scarlets", away:"Cardiff", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"19:45", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
+  { id:"e207", sport:"rugby", city:"llanelli", tier:"URC Rd 3", home:"Scarlets", away:"Benetton", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"17:30", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
+  { id:"e208", sport:"rugby", city:"treviso", tier:"URC Rd 1", home:"Benetton", away:"Dragons", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
+  { id:"e209", sport:"rugby", city:"treviso", tier:"URC Rd 2", home:"Benetton", away:"Connacht", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
+  { id:"e210", sport:"rugby", city:"parma", tier:"URC Rd 1", home:"Zebre Parma", away:"Vodacom Bulls", venue:"Stadio Sergio Lanfranchi", area:"Emilia-Romagna", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
 ];
 
 module.exports = { SPORTS, CITIES, EVENTS };
