@@ -50,7 +50,7 @@ async function callClaude(apiKey, prompt) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
+      max_tokens: 16000, // raised alongside research-new-fixtures.js — same real failure mode applies here (many proposed fixtures to verify = long output).
       messages: [{ role: 'user', content: prompt }],
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
     }),
@@ -89,7 +89,7 @@ For EACH fixture, independently search and check:
 - Could this be describing a past/different season rather than the one implied?
 - Is the venue/city pairing geographically real (this venue is actually in this city)?
 
-Output ONLY a JSON array, one object per input fixture, in the same order, shaped like:
+Output ONLY a JSON array, compact (one line per object, no pretty-printing — verbose formatting wastes tokens that matter when verifying many fixtures at once), one object per input fixture, in the same order, shaped like:
 {"verdict":"pass","reason":"brief note on what confirmed it"}
 or
 {"verdict":"uncertain","reason":"specific problem found, e.g. 'source says Friday but 5 Sep 2026 is a Saturday' or 'could not find independent confirmation'"}

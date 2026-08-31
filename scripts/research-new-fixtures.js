@@ -180,7 +180,12 @@ Rules, non-negotiable:
 - Skip anything you're not genuinely confident is real and upcoming. Fewer, solid proposals beat more, shaky ones.
 - If a source's data doesn't check out (fixtures not yet published, national-team-only with no club calendar, etc.), skip it and say so in your summary rather than forcing a weak entry — this has happened before (Milan, Lisbon) and is a fine, honest outcome.
 
-Output ONLY a JSON array (no other text), each object shaped like:
+Output ONLY a JSON array (no other text). Write it COMPACT — one line per
+object, no pretty-printing, no extra indentation or line breaks within an
+object. This isn't just a style preference: verbose formatting burns
+tokens that could otherwise fit more fixtures within the response limit,
+and a genuinely wide search like this one needs that space. Each object
+shaped like:
 {"sport":"football","city":"london","tier":"...","home":"...","away":"...","venue":"...","area":"...","date":"Sat 05 Sep","isoDate":"2026-09-05","time":"15:00","status":"official","source":"...","note":"optional — flag any conflict or estimate here","isNewCity":false,"cityCountry":"UK"}
 
 Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxing, etc). Set "isNewCity":true and include "cityCountry" when proposing a city not in the existing list.`;
@@ -194,7 +199,7 @@ Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxi
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8192, // raised from 4096 — a genuinely open-ended search across all of Europe can reasonably surface more findings in one run than the old fixed-list version did
+      max_tokens: 16000, // raised from 8192 after a real failure: the widened, genuinely open-ended search found enough fixtures that the response was cut off mid-JSON before finishing. This only affects the ceiling, not actual cost — billing is based on tokens genuinely generated, not this limit.
       messages: [{ role: 'user', content: prompt }],
       tools: [{ type: 'web_search_20250305', name: 'web_search' }],
     }),
@@ -213,9 +218,25 @@ Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxi
     const jsonMatch = textBlocks.match(/\[[\s\S]*\]/);
     proposed = JSON.parse(jsonMatch[0]);
   } catch (err) {
-    console.error('Could not parse a JSON array from the response. Raw output:');
-    console.error(textBlocks);
-    process.exit(1);
+    // Real failure mode this project has actually hit: the response gets
+    // cut off mid-array if a genuinely wide search finds enough fixtures
+    // to exceed max_tokens, even after raising it. Rather than discard
+    // every fixture the search DID find just because the last one or two
+    // got cut off, try to salvage each complete {...} object individually
+    // — a truncated final entry is thrown away, but everything before it
+    // survives instead of the whole run producing nothing.
+    console.error('Could not parse the full response as one JSON array — attempting to salvage individual complete entries instead of discarding everything.');
+    const objectMatches = textBlocks.match(/\{[^{}]*\}/g) || [];
+    proposed = [];
+    for (const objText of objectMatches) {
+      try { proposed.push(JSON.parse(objText)); } catch { /* skip this one, keep going */ }
+    }
+    if (proposed.length === 0) {
+      console.error('Could not salvage anything usable either. Raw output:');
+      console.error(textBlocks);
+      process.exit(1);
+    }
+    console.error(`Salvaged ${proposed.length} complete fixture(s) despite the truncated response.`);
   }
 
   console.log(`This run's discovery sources: ${thisRunsSources.map(s => s.name).join(', ')}`);
@@ -236,3 +257,4 @@ main().catch(err => {
   console.error(err);
   process.exit(1);
 });
+
