@@ -178,6 +178,7 @@ Rules, non-negotiable:
 - Prefer official sources (the club/league/venue's own site) over aggregators. If sources conflict, note the conflict in a "note" field rather than silently picking one.
 - If you cannot find a confirmed time, use a clearly-labeled standard-slot estimate and say so in a "note" field — never present an estimate as confirmed.
 - Skip anything you're not genuinely confident is real and upcoming. Fewer, solid proposals beat more, shaky ones.
+- HARD CAP: propose at most 40 fixtures this run, even if you find more. If you find more than 40 genuinely good candidates, keep the 40 you're most confident in and stop — the rest will still be there to find next month. This exists specifically because a wide-open search can find enough real fixtures to exceed the response length limit and get cut off mid-output; capping the count keeps the response complete instead of truncated.
 - If a source's data doesn't check out (fixtures not yet published, national-team-only with no club calendar, etc.), skip it and say so in your summary rather than forcing a weak entry — this has happened before (Milan, Lisbon) and is a fine, honest outcome.
 
 Output ONLY a JSON array (no other text). Write it COMPACT — one line per
