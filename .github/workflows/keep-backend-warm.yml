@@ -1,0 +1,34 @@
+name: Keep backend warm
+
+# Render's free tier spins the backend down after a period of inactivity,
+# and cold-start time turned out to be inconsistent enough in practice
+# that even a generous retry window in the app itself sometimes wasn't
+# enough — confirmed by real testing: the app worked once, then failed
+# again shortly after on a refresh, which pointed at the sleep cycle
+# being more aggressive than assumed rather than anything wrong with the
+# app's own connection logic.
+#
+# This workflow doesn't fix that by waiting better — it prevents the
+# problem from happening at all, by pinging the backend regularly enough
+# that it never gets the chance to fully spin down between real visits.
+
+on:
+  schedule:
+    # Every 10 minutes — comfortably inside whatever Render's actual idle
+    # threshold turns out to be, without running so often it's wasteful.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    # Manual trigger from the Actions tab, useful to warm it up on demand
+    # right before you're about to demo or test the app.
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the backend's health endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://fixture-api-rq4s.onrender.com/api/health)
+          echo "Health check responded with HTTP $response"
+          if [ "$response" != "200" ]; then
+            echo "::warning::Backend did not respond with 200 — it may be cold-starting from this very ping, which is fine, or something else may be wrong."
+          fi
