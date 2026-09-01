@@ -94,7 +94,46 @@ body{font-family:'IBM Plex Sans',sans-serif; color:var(--chrome-text);}
 .saved-toggle{flex:0 0 auto; padding:9px 12px; border-radius:8px; border:none; font-weight:600; font-size:13px; background:var(--chrome-surface); color:var(--chrome-text); font-family:inherit;}
 .saved-toggle.active{background:#E85D75; color:var(--ink);}
 .body{flex:1; position:relative; overflow:hidden;}
-.view{position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+.view{position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; display:none;}
+.view.active-view{display:block;}
+/* Desktop: Map and List shown side by side, not toggled — there's room
+   for both, and a map-plus-list split view is the established pattern
+   for this kind of app (Google Maps, Airbnb, Zillow all do this once
+   there's space). The Map/List toggle buttons still exist underneath
+   but are hidden here, since there's no single "active view" to toggle
+   between anymore — both are always showing. */
+@media (min-width: 900px){
+  .body{display:grid; grid-template-columns: 420px 1fr; grid-template-rows: 1fr;}
+  .view{position:relative; inset:auto; display:block !important; height:100%; min-height:0; overflow-y:auto;}
+  #listView{border-right:1px solid var(--chrome-border); grid-column:1; grid-row:1;}
+  #mapView{grid-column:2; grid-row:1;}
+  #mapBtn, #listBtn{display:none;}
+  /* .body's other children (sheetHost, sportSheetHost, countrySheetHost,
+     authHost) are empty pass-through containers for modals that position
+     themselves via their own fixed/absolute styling — without this,
+     display:grid on .body auto-places them as extra implicit grid rows
+     too, which was silently breaking mapView/listView's height
+     resolution (their real bug: 4 implicit rows instead of the intended
+     1, since these hosts count as grid items by default). display:contents
+     removes them from grid layout participation entirely while their
+     injected modal content still renders and positions itself correctly. */
+  #sheetHost, #sportSheetHost, #countrySheetHost, #authHost{display:contents;}
+}
+/* Wide desktop: both the map AND the list get more room, rather than one
+   growing at the other's expense — this app needs the map genuinely large
+   enough to judge "what's near me" at a glance, AND a list that doesn't
+   waste a wide screen's width on a single narrow column. Below this
+   breakpoint, the 900px layout above still applies unchanged (side by
+   side, single-column list) — this is additive, not a replacement. Placed
+   directly after the block it overrides, since CSS resolves ties between
+   equal-specificity rules by source order, not by which media query is
+   "more specific" — an earlier version of this rule was placed near the
+   *other*, unrelated 900px block further up and silently lost every tie.
+*/
+@media (min-width: 1300px){
+  #app{max-width:1500px;}
+  .body{grid-template-columns: 640px 1fr;}
+}
 .map-canvas{height:100%; position:relative; isolation:isolate;}
 #leafletMap{position:absolute; inset:0;}
 .map-label{position:absolute; top:10px; left:14px; z-index:500; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:var(--map-label-text); letter-spacing:0.4px; background:var(--map-label-bg); padding:3px 7px; border-radius:5px; pointer-events:none; transition:background 0.2s ease, color 0.2s ease;}
@@ -110,6 +149,12 @@ body{font-family:'IBM Plex Sans',sans-serif; color:var(--chrome-text);}
 .empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; padding:24px; text-align:center;}
 .empty span{font-size:13px; color:var(--chrome-text-muted);}
 .list{padding:14px 18px 24px; display:flex; flex-direction:column; gap:10px;}
+/* Placed directly after the rule it overrides — same lesson as the .body
+   grid fix above: equal-specificity rules resolve ties by source order,
+   not by which media query condition is "more specific." */
+@media (min-width: 1300px){
+  .list{display:grid; grid-template-columns:repeat(2, 1fr); align-content:start;}
+}
 .card{position:relative; text-align:left; width:100%; background:var(--paper); border:none; border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; font-family:inherit; cursor:pointer;}
 .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding-right:30px;}
 .card-sport{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;}
@@ -176,8 +221,8 @@ body{font-family:'IBM Plex Sans',sans-serif; color:var(--chrome-text);}
   </div>
   <div class="active-filters" id="activeFilters"></div>
   <div class="body">
-    <div class="view" id="mapView"></div>
-    <div class="view" id="listView" style="display:none;"></div>
+    <div class="view active-view" id="mapView"></div>
+    <div class="view" id="listView"></div>
     <div id="sheetHost"></div>
     <div id="sportSheetHost"></div>
     <div id="countrySheetHost"></div>
@@ -366,32 +411,6 @@ let EVENTS = [
   { id:"e182", sport:"rugby", city:"paris", tier:"Top 14", home:"Stade Français Paris", away:"USA Perpignan", venue:"Stade Jean-Bouin", area:"Paris", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"19:05", status:"official", source:"Club box office", tag:"real", blurb:"Paris' 3rd sport in the dataset, alongside tennis (Paris Masters) and golf (FedEx Open de France).", lat:48.8412, lng:2.2531 },
   { id:"e183", sport:"basketball", city:"lyon", tier:"EuroLeague", home:"LDLC ASVEL Villeurbanne", away:"Maccabi Tel Aviv", venue:"Astroballe", area:"Villeurbanne", date:"Thu 24 Sep", isoDate:"2026-09-24", time:"20:45", status:"official", source:"Club box office", tag:"real", lat:45.7728, lng:4.8797 },
   { id:"e184", sport:"rugby", city:"gloucester", tier:"Investec Champions Cup", home:"Gloucester Rugby", away:"Union Bordeaux-Bègles", venue:"Kingsholm Stadium", area:"Gloucester", date:"Fri 16 Oct", isoDate:"2026-10-16", time:"19:45", status:"official", source:"Club box office", tag:"real", blurb:"Champions Cup Round 1 — the reigning back-to-back champions' title defence opens away at Kingsholm.", lat:51.8683, lng:-2.2493 },
-  { id:"e185", sport:"rugbyleague", city:"perpignan", tier:"Super League Rd 26", home:"Catalans Dragons", away:"York Knights", venue:"Stade Gilbert Brutus", area:"Pyrénées-Orientales", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"17:00", status:"official", source:"https://www.alloutrugbyleague.co.uk/news/super-league-fixtures-live-full-1529082", tag:"real" },
-  { id:"e186", sport:"football", city:"amsterdam", tier:"Eredivisie Md 7", home:"Ajax", away:"Excelsior", venue:"Johan Cruijff ArenA", area:"North Holland", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"20:00", status:"official", source:"https://english.ajax.nl/games", tag:"real" },
-  { id:"e187", sport:"football", city:"naples", tier:"Serie A Md 6", home:"Napoli", away:"Frosinone", venue:"Stadio Diego Armando Maradona", area:"Campania", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"13:30", status:"official", source:"https://www.goal.com/en/team/ssc-napoli/fixtures-results/gi0l1habji5hpgar77dl5jqe", tag:"real" },
-  { id:"e188", sport:"football", city:"alkmaar", tier:"Eredivisie Md 5", home:"AZ Alkmaar", away:"Willem II", venue:"AFAS Stadion", area:"North Holland", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"https://www.goal.com/en/team/az-alkmaar/fixtures-results/3kfktv64h7kg7zryax1wktr5r", tag:"real" },
-  { id:"e189", sport:"rugby", city:"limerick", tier:"URC Rd 1", home:"Munster", away:"Glasgow Warriors", venue:"Thomond Park", area:"Munster", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
-  { id:"e190", sport:"rugby", city:"galway", tier:"URC Rd 1", home:"Connacht", away:"DHL Stormers", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e191", sport:"rugby", city:"galway", tier:"URC Rd 5", home:"Connacht", away:"Leinster", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 30 Oct", isoDate:"2026-10-30", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e192", sport:"rugby", city:"llanelli", tier:"URC Rd 1", home:"Scarlets", away:"Cardiff", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"19:45", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
-  { id:"e193", sport:"rugby", city:"llanelli", tier:"URC Rd 3", home:"Scarlets", away:"Benetton", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"17:30", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
-  { id:"e194", sport:"rugby", city:"treviso", tier:"URC Rd 1", home:"Benetton", away:"Dragons", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
-  { id:"e195", sport:"rugby", city:"treviso", tier:"URC Rd 2", home:"Benetton", away:"Connacht", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e196", sport:"rugby", city:"parma", tier:"URC Rd 1", home:"Zebre Parma", away:"Vodacom Bulls", venue:"Stadio Sergio Lanfranchi", area:"Emilia-Romagna", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
-  { id:"e197", sport:"rugby", city:"galway", tier:"Champions Cup Rd 1", home:"Connacht", away:"Saracens", venue:"Dexcom Stadium", area:"Connacht", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"17:30", status:"official", source:"https://www.connachtrugby.ie/news/champions-cup-fixture-details-confirmed/bp3759/", tag:"real" },
-  { id:"e198", sport:"rugbyleague", city:"perpignan", tier:"Super League Rd 26", home:"Catalans Dragons", away:"York Knights", venue:"Stade Gilbert Brutus", area:"Pyrénées-Orientales", date:"Sat 05 Sep", isoDate:"2026-09-05", time:"17:00", status:"official", source:"https://www.alloutrugbyleague.co.uk/news/super-league-fixtures-live-full-1529082", tag:"real" },
-  { id:"e199", sport:"football", city:"amsterdam", tier:"Eredivisie Md 7", home:"Ajax", away:"Excelsior", venue:"Johan Cruijff ArenA", area:"North Holland", date:"Sat 19 Sep", isoDate:"2026-09-19", time:"20:00", status:"official", source:"https://english.ajax.nl/games", tag:"real" },
-  { id:"e200", sport:"football", city:"naples", tier:"Serie A Md 6", home:"Napoli", away:"Frosinone", venue:"Stadio Diego Armando Maradona", area:"Campania", date:"Sun 11 Oct", isoDate:"2026-10-11", time:"18:30", status:"official", source:"https://www.goal.com/en/team/ssc-napoli/fixtures-results/gi0l1habji5hpgar77dl5jqe", tag:"real" },
-  { id:"e201", sport:"football", city:"alkmaar", tier:"Eredivisie Md 5", home:"AZ Alkmaar", away:"Willem II", venue:"AFAS Stadion", area:"North Holland", date:"Fri 11 Sep", isoDate:"2026-09-11", time:"20:00", status:"official", source:"https://www.goal.com/en/team/az-alkmaar/fixtures-results/3kfktv64h7kg7zryax1wktr5r", tag:"real" },
-  { id:"e202", sport:"rugby", city:"limerick", tier:"URC Rd 1", home:"Munster", away:"Glasgow Warriors", venue:"Thomond Park", area:"Munster", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
-  { id:"e203", sport:"rugby", city:"galway", tier:"URC Rd 1", home:"Connacht", away:"DHL Stormers", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e204", sport:"rugby", city:"galway", tier:"URC Rd 5", home:"Connacht", away:"Leinster", venue:"Dexcom Stadium", area:"Connacht", date:"Fri 30 Oct", isoDate:"2026-10-30", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e205", sport:"rugby", city:"galway", tier:"EPCR Champions Cup Rd 1", home:"Connacht", away:"Saracens", venue:"Dexcom Stadium", area:"Connacht", date:"Sat 17 Oct", isoDate:"2026-10-17", time:"17:30", status:"official", source:"https://www.connachtrugby.ie/news/champions-cup-fixture-details-confirmed/bp3759/", tag:"real" },
-  { id:"e206", sport:"rugby", city:"llanelli", tier:"URC Rd 1", home:"Scarlets", away:"Cardiff", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"19:45", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
-  { id:"e207", sport:"rugby", city:"llanelli", tier:"URC Rd 3", home:"Scarlets", away:"Benetton", venue:"Parc y Scarlets", area:"Carmarthenshire", date:"Sat 10 Oct", isoDate:"2026-10-10", time:"17:30", status:"official", source:"https://www.scarlets.wales/article/full-bkt-urc-fixture-list-for-2026-27-season/", tag:"real" },
-  { id:"e208", sport:"rugby", city:"treviso", tier:"URC Rd 1", home:"Benetton", away:"Dragons", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 25 Sep", isoDate:"2026-09-25", time:"19:45", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
-  { id:"e209", sport:"rugby", city:"treviso", tier:"URC Rd 2", home:"Benetton", away:"Connacht", venue:"Stadio Comunale di Monigo", area:"Veneto", date:"Fri 02 Oct", isoDate:"2026-10-02", time:"19:45", status:"official", source:"https://www.connachtrugby.ie/news/2026-27-fixtures-announced/bp3735/", tag:"real" },
-  { id:"e210", sport:"rugby", city:"parma", tier:"URC Rd 1", home:"Zebre Parma", away:"Vodacom Bulls", venue:"Stadio Sergio Lanfranchi", area:"Emilia-Romagna", date:"Sat 26 Sep", isoDate:"2026-09-26", time:"17:30", status:"official", source:"https://www.munsterrugby.ie/2026/05/19/2026-27-urc-fixtures-released/", tag:"real" },
 ];
 
 const STATUS_LABEL = { official:"Buy — official", club_platform:"Buy — club platform", free_gate:"Free / pay on gate", sold_out:"Sold out" };
@@ -418,7 +437,7 @@ const TODAY_ISO = new Date().toISOString().slice(0, 10);
 // password hashing, real persistence to disk, shared across anyone using
 // that same deployed URL.
 // ---------------------------------------------------------------------------
-const API_BASE = ""; // <-- set this after deploying /backend, e.g. "https://your-app.onrender.com"
+const API_BASE = "https://fixture-api-rq4s.onrender.com"; // live backend — same one the Vibecode native app uses, so both stay in sync automatically
 let usingBackend = false;
 let authToken = null; // NOT persisted to disk/localStorage on purpose — see README
 
@@ -710,9 +729,19 @@ let leafletMap = null;
 let leafletMarkers = [];
 let leafletTileLayer = null;
 let theme = 'dark';
+// CARTO changed policy very recently (confirmed via their own current docs):
+// these raster basemap tiles now require a free API key, or they load with
+// an "API KEY REQUIRED" watermark plastered across them. Per CARTO's own
+// FAQ, this is a notice, not an outage — the map still fully functions,
+// it just looks unpolished until a key is added. Get a free one (up to 5
+// million tile requests/month) at https://carto.com/basemaps/apikey and
+// paste it below — leave blank to keep working exactly as before (with
+// the watermark) if you'd rather not set this up right now.
+const CARTO_API_KEY = "cb1_2pxg_1_23ec0d0a793590c020a5e0bd"; // your key, embedded directly — no manual editing needed
+const CARTO_KEY_PARAM = CARTO_API_KEY ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : '';
 const TILE_URLS = {
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${CARTO_KEY_PARAM}`,
+  light: `https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${CARTO_KEY_PARAM}`,
 };
 
 function applyTheme(){
@@ -1079,12 +1108,15 @@ function setView(v){
   state.view = v;
   document.getElementById('mapBtn').classList.toggle('active', v==='map');
   document.getElementById('listBtn').classList.toggle('active', v==='list');
-  document.getElementById('mapView').style.display = v==='map' ? 'block' : 'none';
-  document.getElementById('listView').style.display = v==='list' ? 'block' : 'none';
+  document.getElementById('mapView').classList.toggle('active-view', v==='map');
+  document.getElementById('listView').classList.toggle('active-view', v==='list');
   // Leaflet miscalculates its size if initialized (or resized) while its
-  // container was display:none — invalidateSize() fixes the grey/broken
-  // tile rendering that would otherwise happen when switching back to Map.
-  if (v==='map' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
+  // container was hidden — invalidateSize() fixes the grey/broken tile
+  // rendering that would otherwise happen when switching back to Map.
+  // Also needed on desktop (see the ≥1000px layout below) since Map and
+  // List share space there and Leaflet still needs a nudge after layout
+  // settles.
+  if (leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
 }
 document.getElementById('mapBtn').onclick = () => setView('map');
 // Shared by the search box, date input, active-filter pill "✕" buttons, and
@@ -1258,18 +1290,52 @@ async function initBackendConnection(){
   const statusEl = document.getElementById('liveStatus');
   const statusText = document.getElementById('liveStatusText');
   statusEl.style.display = 'flex';
-  try{
-    const res = await fetch(`${API_BASE}/api/health`);
-    if (!res.ok) throw new Error('unhealthy');
-    usingBackend = true;
-    statusEl.classList.add('ok');
-    statusText.textContent = `✓ Connected to live backend at ${API_BASE}`;
-    await loadAllEvents();
-  }catch(err){
-    usingBackend = false;
-    statusEl.classList.add('fail');
-    statusText.textContent = `Could not reach backend at ${API_BASE} — showing local demo data`;
-    renderAll();
+
+  // Render's free tier fully stops the container after a period of
+  // inactivity (not just "sleeping") and its own documented cold-start
+  // time is up to ~50 seconds. Confirmed via Render's own server logs
+  // directly: 6 separate successful startups, zero crashes — the server
+  // itself is healthy every time, so a failure here isn't a server
+  // problem. The REAL remaining bug, found after that ruled out a crash:
+  // earlier versions of this function added delays BETWEEN attempts but
+  // never put a timeout on any INDIVIDUAL attempt — if Render holds a
+  // connection open while slowly booting rather than rejecting it
+  // outright, one single fetch could hang far longer than intended,
+  // silently eating the whole retry budget on one stuck attempt instead
+  // of actually cycling through several. Each attempt below now aborts
+  // itself if it takes too long, guaranteeing the loop actually retries
+  // rather than potentially blocking on attempt #1 forever.
+  const maxAttempts = 6;
+  const delaysMs = [0, 3000, 8000, 8000, 8000, 8000];
+  const perAttemptTimeoutMs = 15000; // each attempt gets a bounded window, not an open-ended wait
+  for (let attempt = 0; attempt < maxAttempts; attempt++){
+    if (delaysMs[attempt] > 0){
+      statusText.textContent = `Waking up the backend (this can take up to a minute if it's been idle) — retrying (attempt ${attempt + 1}/${maxAttempts})...`;
+      await new Promise(r => setTimeout(r, delaysMs[attempt]));
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), perAttemptTimeoutMs);
+    try{
+      const res = await fetch(`${API_BASE}/api/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error('unhealthy');
+      usingBackend = true;
+      statusEl.classList.remove('fail');
+      statusEl.classList.add('ok');
+      statusText.textContent = `✓ Connected to live backend at ${API_BASE}`;
+      await loadAllEvents();
+      return;
+    }catch(err){
+      clearTimeout(timeoutId);
+      if (attempt === maxAttempts - 1){
+        usingBackend = false;
+        loadingEvents = false; // defensive reset — whatever set this true, the loading process has now definitively ended one way or another, so the list view shouldn't stay stuck showing "Loading events…" forever
+        statusEl.classList.add('fail');
+        statusText.textContent = `Could not reach backend at ${API_BASE} after several attempts — showing local demo data. If this backend runs on Render's free tier, it may just need longer to wake up; try refreshing the page in a minute.`;
+        renderAll();
+      }
+      // otherwise loop continues to the next attempt
+    }
   }
 }
 
