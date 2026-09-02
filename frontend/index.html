@@ -1278,8 +1278,40 @@ async function loadAllEvents(){
   loadingEvents = true;
   renderAll();
   try{
-    const res = await fetch(`${API_BASE}/api/events`);
-    if (res.ok) EVENTS = await res.json();
+    // Fetch sports/cities alongside events, not just events alone — the
+    // static SPORTS/CITIES objects baked into this HTML file are a
+    // snapshot from whenever it was last regenerated. If the live
+    // backend has grown since (a new sport or city added), those IDs
+    // wouldn't exist in the static objects at all, which risks more than
+    // just a filtering gap — anything reading CITIES[cityId].name or
+    // SPORTS[sportId].color for one of those events would hit undefined
+    // and could break rendering entirely, not just under-count events.
+    // Found the under-counting symptom via direct testing (EVENTS.length
+    // was correct at 156, filteredEvents() incorrectly returned 137) and
+    // traced it back to this same root cause.
+    const [eventsRes, sportsRes, citiesRes] = await Promise.all([
+      fetch(`${API_BASE}/api/events`),
+      fetch(`${API_BASE}/api/sports`),
+      fetch(`${API_BASE}/api/cities`),
+    ]);
+    if (eventsRes.ok) EVENTS = await eventsRes.json();
+    if (sportsRes.ok){
+      const liveSports = await sportsRes.json();
+      liveSports.forEach(s => { SPORTS[s.id] = { name: s.name, color: s.color }; });
+    }
+    if (citiesRes.ok){
+      const liveCities = await citiesRes.json();
+      liveCities.forEach(c => { CITIES[c.id] = { name: c.name, country: c.country }; });
+    }
+    // Now that SPORTS/CITIES definitely include everything EVENTS
+    // actually references, it's safe to also default the filter state to
+    // "everything selected" using the now-complete lists — otherwise a
+    // genuinely new sport/city would still silently be filtered out even
+    // though it's now safe to render.
+    EVENTS.forEach(e => {
+      state.sports.add(e.sport);
+      if (CITIES[e.city]) state.countries.add(CITIES[e.city].country);
+    });
   }catch(err){ console.error(err); }
   loadingEvents = false;
   renderAll();
