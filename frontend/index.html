@@ -852,6 +852,15 @@ function renderMap(){
   });
 
   byVenue.forEach(({ soonest: ev, count }) => {
+    // Defensive guard: one event with missing/invalid coordinates used to
+    // crash this entire loop with "Invalid LatLng object," which halted
+    // renderMap() mid-way and left the whole page in a broken state (list
+    // view stuck, status message never updated) — not just that one pin
+    // missing. Skip just this one pin instead of taking down the render.
+    if (typeof ev.lat !== 'number' || typeof ev.lng !== 'number' || isNaN(ev.lat) || isNaN(ev.lng)){
+      console.warn(`Skipping map pin for event ${ev.id} (${title(ev)}) — missing or invalid coordinates.`);
+      return;
+    }
     const color = SPORTS[ev.sport].color;
     const badge = count > 1
       ? `<div style="position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:#10151F; color:#FFB100; font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; display:flex; align-items:center; justify-content:center; border:1.5px solid #FFB100;">${count}</div>`
