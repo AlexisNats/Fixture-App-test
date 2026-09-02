@@ -48,6 +48,12 @@ jobs:
             fs.writeFileSync('frontend/index.html', content);
           "
 
+      - name: Validate data integrity before committing anything
+        run: node scripts/validate-data-integrity.js
+        # Same safeguard added to research-new-fixtures.yml — this
+        # workflow also modifies both files, so it deserves the same
+        # check before anything gets pushed to a live deploy.
+
       - name: Commit changes, if any
         run: |
           git config user.name "github-actions[bot]"
