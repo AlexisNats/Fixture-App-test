@@ -678,7 +678,17 @@ function openCountrySheet(){
 function closeCountrySheet(){ document.getElementById('countrySheetHost').innerHTML = ''; }
 document.getElementById('countryBtn').onclick = openCountrySheet;
 
-function statusPillHtml(status){
+function statusPillHtml(status, ticketUrl){
+  // Once a fixture has a real, verified ticketUrl (official club/league
+  // sources only — see research-new-fixtures.js for the sourcing
+  // standard), the pill becomes an actual clickable link instead of
+  // decorative text. Most existing events won't have this yet — this is
+  // additive infrastructure, not a retroactive requirement. stopPropagation
+  // keeps a tap on the pill from also triggering the card's own click
+  // handler (opening the detail view) underneath it.
+  if (ticketUrl){
+    return `<a class="pill" href="${esc(ticketUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="color:${STATUS_COLOR[status]}; border:1px solid ${STATUS_COLOR[status]}; text-decoration:none; cursor:pointer;">${STATUS_LABEL[status]} ↗</a>`;
+  }
   return `<span class="pill" style="color:${STATUS_COLOR[status]}; border:1px solid ${STATUS_COLOR[status]};">${STATUS_LABEL[status]}</span>`;
 }
 
@@ -946,7 +956,7 @@ function renderList(){
           ${userLocation ? `<span>📏 ${distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng).toFixed(1)} km</span>` : ''}
         </div>
         <div style="display:flex; align-items:center;">
-          ${statusPillHtml(ev.status)}
+          ${statusPillHtml(ev.status, ev.ticketUrl)}
           ${TAG_BADGE[ev.tag]}
         </div>
       </div>`;
@@ -993,7 +1003,7 @@ function openSheet(id){
         </div>
         ${ev.blurb ? `<p class="sheet-blurb">${esc(ev.blurb)}</p>` : ''}
         <div style="display:flex; align-items:center; gap:10px;">
-          ${statusPillHtml(ev.status)}
+          ${statusPillHtml(ev.status, ev.ticketUrl)}
           ${TAG_BADGE[ev.tag]}
           ${ev.source ? `<span class="sheet-source">via ${esc(ev.source)}</span>` : ''}
         </div>
