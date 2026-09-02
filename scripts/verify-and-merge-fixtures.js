@@ -112,6 +112,18 @@ Be genuinely willing to fail an entry — a false "pass" defeats the entire poin
   const uncertain = [];
   proposed.forEach((fixture, i) => {
     const v = verdicts[i] || { verdict: 'uncertain', reason: 'No verdict returned for this entry.' };
+    // Coordinate validation happens regardless of the AI verification
+    // verdict — this isn't a factual-accuracy question the verification
+    // pass is designed to catch, it's a structural one. Found the hard
+    // way: a fixture merged without coordinates doesn't just fail to show
+    // a pin, it crashes the map rendering entirely for every user, taking
+    // the whole app down with it. Never auto-merge past this check.
+    const hasValidCoords = typeof fixture.lat === 'number' && typeof fixture.lng === 'number'
+      && !isNaN(fixture.lat) && !isNaN(fixture.lng);
+    if (!hasValidCoords){
+      uncertain.push({ ...fixture, verificationNote: 'Missing or invalid lat/lng coordinates — this would crash the map if merged, so it needs manual coordinates added before going in, regardless of the verification verdict.' });
+      return;
+    }
     if (v.verdict === 'pass') verified.push({ ...fixture, verificationNote: v.reason });
     else uncertain.push({ ...fixture, verificationNote: v.reason });
   });
@@ -132,24 +144,34 @@ Be genuinely willing to fail an entry — a false "pass" defeats the entire poin
   const { SPORTS, CITIES, EVENTS } = require(SEED_PATH);
   const existingIds = new Set(EVENTS.map(e => e.id));
   const existingCityIds = new Set(CITIES.map(c => c.id));
+  const existingSportIds = new Set(SPORTS.map(s => s.id));
 
   // Generate fresh sequential IDs continuing from the highest existing one,
   // rather than trusting the proposal to have picked non-colliding IDs.
   let nextIdNum = Math.max(0, ...EVENTS.map(e => parseInt((e.id || '').replace('e', ''), 10) || 0)) + 1;
 
   const newCities = [];
+  const newSports = [];
   const newEvents = verified.map(f => {
     const id = `e${nextIdNum++}`;
     if (f.isNewCity && !existingCityIds.has(f.city)) {
       newCities.push({ id: f.city, name: f.cityName || f.city, country: f.cityCountry || 'Unknown' });
       existingCityIds.add(f.city);
     }
-    const { verificationNote, isNewCity, cityCountry, cityName, note, ...clean } = f;
+    // Without this, a genuinely new sport's events would reference a sport
+    // id with no matching name/color entry anywhere — breaking how the
+    // app displays them. Caught as a real gap, not a hypothetical one.
+    if (f.isNewSport && !existingSportIds.has(f.sport)) {
+      newSports.push({ id: f.sport, name: f.sportName || f.sport, color: f.sportColor || '#8A8578' });
+      existingSportIds.add(f.sport);
+    }
+    const { verificationNote, isNewCity, cityCountry, cityName, isNewSport, sportName, sportColor, note, ...clean } = f;
     return { id, ...clean, tag: 'real', status: clean.status || 'official' };
   });
 
   const updatedEvents = [...EVENTS, ...newEvents];
   const updatedCities = [...CITIES, ...newCities];
+  const updatedSports = [...SPORTS, ...newSports];
 
   let seedContent = fs.readFileSync(SEED_PATH, 'utf8');
   const eventsBlock = 'const EVENTS = [\n' + updatedEvents.map(formatEvent).join('\n') + '\n];';
@@ -158,18 +180,37 @@ Be genuinely willing to fail an entry — a false "pass" defeats the entire poin
     const citiesBlock = 'const CITIES = [\n' + updatedCities.map(c => `  { id: "${c.id}", name: "${c.name}", country: "${c.country}" },`).join('\n') + '\n];';
     seedContent = seedContent.replace(/const CITIES = \[\n[\s\S]*?\n\];/, citiesBlock);
   }
+  if (newSports.length > 0) {
+    const sportsBlock = 'const SPORTS = [\n' + updatedSports.map(s => `  { id: "${s.id}", name: "${s.name}", color: "${s.color}" },`).join('\n') + '\n];';
+    seedContent = seedContent.replace(/const SPORTS = \[\n[\s\S]*?\n\];/, sportsBlock);
+  }
   fs.writeFileSync(SEED_PATH, seedContent);
 
   // Regenerate frontend's copy to match — same pattern used everywhere
-  // else in this project after a seed-data.js change.
+  // else in this project after a seed-data.js change. This previously
+  // only regenerated EVENTS, silently never propagating new CITIES or
+  // SPORTS to the frontend even when they were added to seed-data.js —
+  // a real gap, fixed here alongside the SPORTS-creation fix above.
   delete require.cache[require.resolve(SEED_PATH)];
   const fresh = require(SEED_PATH);
-  const frontendEventsBlock = 'let EVENTS = [\n' + fresh.EVENTS.map(formatEvent).join('\n') + '\n];';
   let frontendContent = fs.readFileSync(FRONTEND_PATH, 'utf8');
+
+  const frontendEventsBlock = 'let EVENTS = [\n' + fresh.EVENTS.map(formatEvent).join('\n') + '\n];';
   frontendContent = frontendContent.replace(/let EVENTS = \[\n[\s\S]*?\n\];/, frontendEventsBlock);
+
+  if (newCities.length > 0) {
+    const citiesEntries = fresh.CITIES.map(c => `${c.id}: { name: ${JSON.stringify(c.name)}, country: ${JSON.stringify(c.country)} }`);
+    const frontendCitiesLine = 'const CITIES = { ' + citiesEntries.join(', ') + ' };';
+    frontendContent = frontendContent.replace(/const CITIES = \{.*?\};/, frontendCitiesLine);
+  }
+  if (newSports.length > 0) {
+    const sportsEntries = fresh.SPORTS.map(s => `${s.id}: { name: ${JSON.stringify(s.name)}, color: ${JSON.stringify(s.color)} }`);
+    const frontendSportsLine = 'const SPORTS = { ' + sportsEntries.join(', ') + ' };';
+    frontendContent = frontendContent.replace(/const SPORTS = \{[\s\S]*?\};/, frontendSportsLine);
+  }
   fs.writeFileSync(FRONTEND_PATH, frontendContent);
 
-  console.log(`Auto-merged ${newEvents.length} fixture(s)${newCities.length ? ` and ${newCities.length} new city/cities` : ''} directly into seed-data.js and frontend/index.html.`);
+  console.log(`Auto-merged ${newEvents.length} fixture(s)${newCities.length ? `, ${newCities.length} new city/cities` : ''}${newSports.length ? `, ${newSports.length} new sport(s)` : ''} directly into seed-data.js and frontend/index.html.`);
 }
 
 main().catch(err => {

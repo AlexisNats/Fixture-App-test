@@ -89,6 +89,7 @@ const DISCOVERY_SOURCES = [
   { name: 'Diamond League (other European legs)', why: 'Paris, Rome, Brussels not yet covered; only London so far' },
   // Netball — in-season check
   { name: 'Netball Super League (England)', why: 'confirmed off-season Aug-Sep in earlier research — worth re-checking once the Feb-June season is active; Leeds, Cardiff, Manchester, Nottingham, Bath all field teams' },
+  { name: 'HSBC SVNS (Rugby Sevens World Championship, European leg)', why: 'confirmed same shape of data that worked well for Diamond League/DP World Tour — a stable, multi-year tour, not a one-off. European leg alternates Valladolid (Spain, new city) and Bordeaux (France, already tracked via Top 14) — locked in through the LA 2028 Olympic cycle per World Rugby\'s own confirmed calendar' },
   // The three sports tried and not yet successfully added, worth
   // continued attempts with a narrower angle each time
   { name: 'Volleyball — named individual clubs (not the league generally)', why: 'general league searches surfaced only national-team tournaments in past attempts; try a specific named club\'s own site instead (e.g. a Bundesliga or SuperLega club directly)' },
@@ -162,6 +163,14 @@ not a restriction:
 Existing cities already tracked (don't re-propose these unless adding a
 genuinely new sport for one of them): ${existingCitiesList}
 Full sport list already in use: ${SPORTS.map(s => s.id).join(', ')}.
+If you propose a fixture for a sport NOT in that list, you must also include
+"isNewSport":true, "sportName" (a clean display name, e.g. "Volleyball"),
+and "sportColor" (a hex color that fits a dark "vidiprinter" aesthetic —
+muted, distinct from the colors already in use: ${SPORTS.map(s => s.color).join(', ')}).
+Without these three fields, a new sport can't be added correctly — its
+events would reference a sport with no name or color, breaking how the
+app displays them. This isn't optional detail, it's required for the
+proposal to be usable.
 
 If you find a real new city, ALSO do a quick follow-up check for a SECOND
 sport in that same city before moving on — this project's own history
@@ -187,9 +196,18 @@ object. This isn't just a style preference: verbose formatting burns
 tokens that could otherwise fit more fixtures within the response limit,
 and a genuinely wide search like this one needs that space. Each object
 shaped like:
-{"sport":"football","city":"london","tier":"...","home":"...","away":"...","venue":"...","area":"...","date":"Sat 05 Sep","isoDate":"2026-09-05","time":"15:00","status":"official","source":"...","note":"optional — flag any conflict or estimate here","isNewCity":false,"cityCountry":"UK"}
+{"sport":"football","city":"london","tier":"...","home":"...","away":"...","venue":"...","area":"...","date":"Sat 05 Sep","isoDate":"2026-09-05","time":"15:00","status":"official","source":"...","note":"optional — flag any conflict or estimate here","isNewCity":false,"cityCountry":"UK","isNewSport":false,"sportName":"","sportColor":"","lat":51.5074,"lng":-0.1278}
 
-Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxing, etc). Set "isNewCity":true and include "cityCountry" when proposing a city not in the existing list.`;
+REQUIRED, not optional: "lat" and "lng" (the venue's real coordinates, as
+decimal numbers, not strings). A fixture without these will be rejected
+before merging — this was found the hard way: fixtures merged without
+coordinates crashed the app's map entirely for every user, not just
+failed to show a pin for that one event, because one invalid coordinate
+broke the whole rendering pass. If you can't find precise venue
+coordinates, use the city's general coordinates rather than omitting the
+field — approximate is fine, missing is not.
+
+Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxing, etc). Set "isNewCity":true and include "cityCountry" when proposing a city not in the existing list. Set "isNewSport":true and include "sportName"/"sportColor" when proposing a sport not in the existing list — omit "isNewSport"/"sportName"/"sportColor" entirely for an existing sport, don't include them as false/empty.`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
