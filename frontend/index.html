@@ -884,7 +884,14 @@ function renderMap(){
   // Auto-fit the map to whatever's actually visible, rather than staying at
   // a fixed city-wide zoom — a filtered-down set of 2 events on one side of
   // town shouldn't leave the map showing mostly empty space.
-  const bounds = L.latLngBounds(evs.map(e => [e.lat, e.lng]));
+  // Same defensive filter as the pin-placement loop above, applied here
+  // too — this is a SEPARATE pass over evs that was missed the first time
+  // round, and it's exactly what was still crashing: L.latLngBounds()
+  // throws on the very first invalid coordinate it hits, same as
+  // L.marker() does, so this needed its own guard, not a shared one.
+  const validCoordEvents = evs.filter(e => typeof e.lat === 'number' && typeof e.lng === 'number' && !isNaN(e.lat) && !isNaN(e.lng));
+  if (validCoordEvents.length === 0) { emptyEl.style.display = 'none'; return; }
+  const bounds = L.latLngBounds(validCoordEvents.map(e => [e.lat, e.lng]));
   if (userLocation) bounds.extend([userLocation.lat, userLocation.lng]);
   leafletMap.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
   emptyEl.style.display = 'none';
@@ -897,6 +904,16 @@ function renderList(){
   if (loadingEvents){ el.innerHTML = `<div class="empty" style="position:static; padding-top:60px;"><span>Loading events…</span></div>`; return; }
   const evs = filteredEvents().slice().sort((a, b) => {
     if (userLocation){
+      const validA = typeof a.lat === 'number' && typeof a.lng === 'number' && !isNaN(a.lat) && !isNaN(a.lng);
+      const validB = typeof b.lat === 'number' && typeof b.lng === 'number' && !isNaN(b.lat) && !isNaN(b.lng);
+      // Same missing-coordinate issue as the map — a NaN result from
+      // distanceKm() here wouldn't crash the sort outright, but produces
+      // inconsistent ordering across browsers. Treat an event with no
+      // valid coordinates as maximally far away, so it sorts to the end
+      // rather than corrupting the comparison.
+      if (!validA && !validB) return 0;
+      if (!validA) return 1;
+      if (!validB) return -1;
       return distanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) - distanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng);
     }
     // Sort by the real ISO date + time, not the display string ("Sat 05
