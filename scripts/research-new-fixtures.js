@@ -207,6 +207,16 @@ broke the whole rendering pass. If you can't find precise venue
 coordinates, use the city's general coordinates rather than omitting the
 field — approximate is fine, missing is not.
 
+OPTIONAL but valuable: "ticketUrl" — a direct link to buy tickets for
+this specific fixture, ONLY from a verified source: the club's or
+league's own official site, or an official league ticketing partner
+(e.g. Ticketmaster as the Premier League's official partner). Never a
+resale/secondary market site (StubHub, Viagogo, etc.) unless explicitly
+named as an official resale partner. If you're not confident the link is
+both real and from a verified source, omit "ticketUrl" entirely rather
+than guessing — an absent link is fine, a wrong or untrustworthy one is
+not, the same standard as everything else in this dataset.
+
 Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxing, etc). Set "isNewCity":true and include "cityCountry" when proposing a city not in the existing list. Set "isNewSport":true and include "sportName"/"sportColor" when proposing a sport not in the existing list — omit "isNewSport"/"sportName"/"sportColor" entirely for an existing sport, don't include them as false/empty.`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
