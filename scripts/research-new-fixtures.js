@@ -207,15 +207,15 @@ broke the whole rendering pass. If you can't find precise venue
 coordinates, use the city's general coordinates rather than omitting the
 field — approximate is fine, missing is not.
 
-OPTIONAL but valuable: "ticketUrl" — a direct link to buy tickets for
-this specific fixture, ONLY from a verified source: the club's or
-league's own official site, or an official league ticketing partner
-(e.g. Ticketmaster as the Premier League's official partner). Never a
-resale/secondary market site (StubHub, Viagogo, etc.) unless explicitly
-named as an official resale partner. If you're not confident the link is
-both real and from a verified source, omit "ticketUrl" entirely rather
-than guessing — an absent link is fine, a wrong or untrustworthy one is
-not, the same standard as everything else in this dataset.
+OPTIONAL but valuable: "ticketUrl" — a link to buy tickets, ONLY from a
+verified source: the club's or league's own official site, or an
+official league ticketing partner (e.g. Ticketmaster as the Premier
+League's official partner). Never a resale/secondary market site
+(StubHub, Viagogo, etc.) unless explicitly named as an official resale
+partner. Two acceptable levels, in order of preference:
+1. Best: a specific page for this exact fixture, if one genuinely exists and you're confident of the URL.
+2. Good fallback: the club's own general official tickets page (not fixture-specific) — this is still fully legitimate and worth including even when a specific per-match link can't be confirmed, since it's still a genuine, verified, correct place to start.
+Only omit "ticketUrl" entirely if you can't confidently identify either — a wrong or untrustworthy link is the failure mode to avoid, not "not fixture-specific enough." Note in your reasoning which of the two levels a given link is, so it's clear later whether it points at the fixture directly or just the club's general tickets page.
 
 Use "eventName" instead of "home"/"away" for non-team events (golf, tennis, boxing, etc). Set "isNewCity":true and include "cityCountry" when proposing a city not in the existing list. Set "isNewSport":true and include "sportName"/"sportColor" when proposing a sport not in the existing list — omit "isNewSport"/"sportName"/"sportColor" entirely for an existing sport, don't include them as false/empty.`;
 
