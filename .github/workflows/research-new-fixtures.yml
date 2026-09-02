@@ -40,6 +40,16 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/verify-and-merge-fixtures.js
 
+      - name: Validate data integrity before committing anything
+        run: node scripts/validate-data-integrity.js
+        # If this fails, the workflow stops here — nothing gets committed
+        # or pushed. This exists specifically because the two real bugs
+        # that caused a multi-day debugging saga (a city/sport reference
+        # with no matching entry, and missing map coordinates) both came
+        # from data reaching a live deploy with nothing catching them
+        # first. This step is that catch, run automatically every time,
+        # not something that has to be remembered.
+
       - name: Commit and push anything auto-merged
         id: automerge
         run: |
